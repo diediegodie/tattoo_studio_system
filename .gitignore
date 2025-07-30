@@ -1,0 +1,50 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.log
+*.db
+*.sqlite3
+instance/
+.env
+.env.*
+
+# === Flet ===
+.flet/
+.flet-build/
+
+# === Flask ===
+*.pid
+migrations/
+*.bak
+
+# === VSCode ===
+.vscode/
+!.vscode/settings.json
+
+# === OS-specific ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Docker ===
+/volumes/
+docker-compose.override.yml
+*.pid
+
+
+# === Backup/Cache ===
+*.zip
+*.tar.gz
+/backups/
+.cache/
+__backup__/
+
+# virtual environments
+venv/
+.env
+.env.local
+.env.production
+.env.development
+.env.testing
+
