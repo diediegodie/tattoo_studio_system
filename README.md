@@ -10,8 +10,6 @@ A fully offline, standalone desktop application for tattoo studio management. Bu
 [Flet UI] ↔ [Flask Backend] ↔ [SQLite Local DB]
      ↑            ↑
  [Local Tasks] ← [Prefect Automations]
-                     ↑
-         [Optional: LangChain + Llama.cpp]
 
 `````
 
@@ -25,7 +23,6 @@ A fully offline, standalone desktop application for tattoo studio management. Bu
 |**Backend**|Flask|API logic and internal processing|
 |**Database**|SQLite|Local embedded storage (portable)|
 |**Automation**|Prefect|Orchestration for tasks and backups|
-|**AI**|LangChain + Llama.cpp (opt.)|Offline AI capabilities (local LLM)|
 |**Packaging**|PyInstaller|Executable ZIP with no external install|
 
 ---
@@ -40,7 +37,6 @@ tattoo_studio_app/
 │   ├── core/               # Configs, logging, constants
 │   ├── db/                 # SQLite models and helpers
 │   ├── logic/              # Business logic, services
-│   └── ai/                 # LangChain setup (optional)
 │
 ├── flows/                  # Prefect automations (e.g. backup)
 ├── static/                 # Icons, qrcode templates, etc
@@ -181,19 +177,7 @@ You can also zip the output folder for distribution.
         
     - UI components
         
-    - Automations
         
-
----
-
-## 🧠 AI Module (optional)
-
-Powered by LangChain + Llama.cpp:
-
-- Local LLM chat for recommendations
-    
-- No internet or external API required
-    
 
 ---
 
@@ -207,8 +191,3 @@ MIT License – Uses only open-source dependencies:
     
 - SQLite (Public Domain)
     
-- Prefect (Apache 2.0)
-    
-- LangChain (MIT)
-    
-- Llama.cpp (MIT)
