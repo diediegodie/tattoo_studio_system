@@ -8,6 +8,8 @@ __pycache__/
 instance/
 .env
 .env.*
+*.pyo
+*.pyd
 
 # === Flet ===
 .flet/
@@ -32,19 +34,36 @@ desktop.ini
 docker-compose.override.yml
 *.pid
 
-
 # === Backup/Cache ===
 *.zip
 *.tar.gz
 /backups/
 .cache/
 __backup__/
+*.bak
+*.swp
+*.swo
 
-# virtual environments
+# === Pytest Cache ===
+.pytest_cache/
+
+# === Virtual Environments ===
 venv/
-.env
-.env.local
-.env.production
-.env.development
-.env.testing
+ENV/
+env/
+.venv/
+
+# === Docs & GitHub ===
 .docs/
+.github/
+
+# === Test Output ===
+htmlcov/
+coverage.*
+*.cover
+*.py,cover
+
+# === Misc ===
+*.orig
+*.tmp
+*.temp
