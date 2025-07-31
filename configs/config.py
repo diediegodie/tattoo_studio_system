@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
+
 class AppConfig(BaseSettings):
     """
     Configuration settings for the Tattoo Studio Manager application.
@@ -20,6 +21,8 @@ class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=True,
+        extra="ignore",  # Ignore extra environment variables
     )
+
 
 config = AppConfig()

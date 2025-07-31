@@ -1,8 +1,8 @@
 #!/bin/bash
 # Always use the venv Python for tests
 
-VENV_PYTHON="./venv/bin/python"
-VENV_PYTEST="./venv/bin/pytest"
+VENV_PYTHON="./.venv/bin/python"
+VENV_PYTEST="./.venv/bin/pytest"
 
 if [ ! -x "$VENV_PYTHON" ]; then
   echo "Virtual environment not found! Please create it and install dependencies."
