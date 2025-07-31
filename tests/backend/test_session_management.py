@@ -6,8 +6,10 @@ Following the project guidelines for testing.
 """
 
 import pytest
+import pytest
 from backend.database import get_session, close_session
 from services.database_initializer import initialize_database
+from backend.database.models.base import Base
 
 
 class TestSessionManagement:
@@ -97,7 +99,7 @@ class TestSessionManagement:
 
     def test_close_session_multiple_calls(self, test_engine, test_session):
         """Test closing session multiple times - edge case."""
-        # Reason: Ensure multiple close calls don't cause errors
+        # Reason: Ensure closing session multiple times does not raise errors
 
         # Initialize database with test engine
         initialize_database(engine=test_engine, session=test_session)
@@ -118,6 +120,7 @@ class TestSessionManagement:
             close_session()
             close_session()
             close_session()
+            assert True
         finally:
             # Restore original sessions
             base_models.Session = original_session_factory
@@ -125,7 +128,7 @@ class TestSessionManagement:
 
     def test_session_operations_after_close(self, test_engine, test_session):
         """Test that new sessions can be created after closing - edge case."""
-        # Reason: Ensure session factory still works after session is closed
+        # Reason: Ensure new sessions can be created after closing previous session
 
         # Initialize database with test engine
         initialize_database(engine=test_engine, session=test_session)
@@ -142,13 +145,10 @@ class TestSessionManagement:
         base_models.session = SessionLocal()
 
         try:
-            # Close session
             close_session()
-
-            # Should be able to get new session
-            new_session = get_session()
-            assert new_session is not None
-            new_session.close()
+            session = get_session()
+            assert session is not None
+            session.close()
         finally:
             # Restore original sessions
             base_models.Session = original_session_factory

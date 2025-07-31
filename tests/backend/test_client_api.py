@@ -4,38 +4,20 @@ Tests for Client API endpoints (CRUD).
 
 import pytest
 import json
-from unittest.mock import patch
 from backend.app_factory import create_app
-from services.database_initializer import initialize_database
+from backend.database.models.base import Base
 
 
 @pytest.fixture
 def client(isolated_test_session, test_engine):
     """Create a test client for the Flask app with proper database setup."""
+    Base.metadata.create_all(bind=test_engine)
     app = create_app()
     app.config["TESTING"] = True
     app.config["DEBUG"] = True
-
     with app.test_client() as client:
         with app.app_context():
-            # Override database connections
-            import backend.database.models.base as base
-
-            original_db = base.db
-            original_session = base.session
-
-            base.db = test_engine
-            base.session = isolated_test_session
-
-            # Initialize database with test engine
-            initialize_database(engine=test_engine, session=isolated_test_session)
-
-            try:
-                yield client
-            finally:
-                # Restore original database connections
-                base.db = original_db
-                base.session = original_session
+            yield client
 
 
 def test_create_client_normal_case(client):

@@ -1,66 +1,70 @@
-"""
-Integration tests for frontend API client connectivity.
-
-This module tests the connection between the Flet frontend and Flask backend
-to ensure proper data flow and error handling.
-"""
-
-# Ensure test isolation before any app/database import
 import os
-
-os.environ["TESTING"] = "1"
-os.environ["DB_URL"] = "sqlite:///:memory:"
-
-import sys
 import time
 import threading
 import pytest
-
-# Add project root to Python path
-project_root = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
-sys.path.insert(0, project_root)
-
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from frontend.utils.api_client import APIClient
-from backend.app import app
-from backend.database import initialize_database
+from backend.app_factory import create_app
+from backend.database.models.base import Base
+from services.database_initializer import initialize_database
 from utils.logger import setup_logger
 
-# Initialize logger
 logger = setup_logger(__name__)
 
 
 class TestFrontendBackendIntegration:
     """
     Integration tests for frontend-backend communication.
-
-    Tests the complete data flow from Flet frontend through API client
-    to Flask backend and database operations.
     """
 
     @classmethod
     def setup_class(cls):
-        """Set up test environment with Flask app running."""
-        # Initialize database with proper test engine
-        from tests.conftest import test_engine, test_session_factory
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
+        """Set up test environment with Flask app and shared file-based SQLite DB."""
+        TEST_DB_URL = "sqlite:///test_integration.db"
 
-        # Create test engine and session for integration tests
-        test_eng = create_engine(
-            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        # Remove old test DB if exists
+        if os.path.exists("test_integration.db"):
+            os.remove("test_integration.db")
+
+        # Create shared engine and tables
+        test_engine = create_engine(
+            TEST_DB_URL, connect_args={"check_same_thread": False}
         )
-        SessionLocal = sessionmaker(bind=test_eng)
-        test_sess = SessionLocal()
+        Base.metadata.create_all(test_engine)
+        initialize_database(engine=test_engine)
 
-        with app.app_context():
-            # Import the function from services directly
-            from services.database_initializer import initialize_database
+        # Patch global references in backend.database.models.base
+        import backend.database.models.base as base
 
-            initialize_database(engine=test_eng, session=test_sess)
+        base.db = test_engine
+        base.Session = sessionmaker(bind=test_engine)
+        base.session = base.Session()
 
-        test_sess.close()
+        # Set environment for Flask app
+        os.environ["TESTING"] = "1"
+        os.environ["DB_URL"] = TEST_DB_URL
+
+        # Create Flask app with test config
+        app = create_app({"TESTING": True, "DB_URL": TEST_DB_URL})
+
+        # Start Flask app in test mode in a separate thread
+        cls.flask_thread = threading.Thread(
+            target=lambda: app.run(
+                host="127.0.0.1", port=5000, debug=False, use_reloader=False
+            ),
+            daemon=True,
+        )
+        cls.flask_thread.start()
+
+        # Wait for Flask app to start
+        time.sleep(2)
+
+        # Initialize API client
+        cls.api_client = APIClient(base_url="http://127.0.0.1:5000")
+
+        logger.info("Integration test setup completed")
+        app = create_app({"TESTING": True, "DB_URL": TEST_DB_URL})
 
         # Start Flask app in test mode in a separate thread
         cls.flask_thread = threading.Thread(

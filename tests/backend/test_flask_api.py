@@ -7,22 +7,23 @@ Following the project guidelines for comprehensive testing.
 
 import pytest
 import json
+import pytest
+import json
 from unittest.mock import patch
 from backend.app_factory import create_app
 from services.database_initializer import initialize_database
+from backend.database.models.base import Base
 
 
 @pytest.fixture
 def client(test_engine, test_session):
     """Create a test client for the Flask app with proper database setup."""
+    Base.metadata.create_all(bind=test_engine)
     app = create_app()
     app.config["TESTING"] = True
-    app.config["DEBUG"] = True  # Enable debug mode for setup endpoint
-
+    app.config["DEBUG"] = True
     with app.test_client() as client:
         with app.app_context():
-            # Initialize database with test engine and session
-            initialize_database(engine=test_engine, session=test_session)
             yield client
 
 

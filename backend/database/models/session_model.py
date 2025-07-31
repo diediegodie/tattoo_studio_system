@@ -3,10 +3,17 @@ Session model and CRUD operations.
 """
 
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
-from .base import Base, session
+from .base import Base
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+
+def get_current_session():
+    """Get the current session from base module."""
+    from . import base
+
+    return base.session
 
 
 class Session(Base):
@@ -57,6 +64,7 @@ def create_session(client_id, artist_id, date, status="planned", notes=None):
     Returns:
         Session: The created session object
     """
+    session = get_current_session()
     try:
         session_obj = Session(
             client_id=client_id,
@@ -87,6 +95,7 @@ def read_session(session_id):
     Returns:
         Session: The session object or None if not found
     """
+    session = get_current_session()
     try:
         session_obj = session.query(Session).filter_by(id=session_id).first()
         if session_obj:
@@ -110,6 +119,7 @@ def update_session(session_id, **kwargs):
     Returns:
         Session: The updated session object or None if not found
     """
+    session = get_current_session()
     try:
         session_obj = session.query(Session).filter_by(id=session_id).first()
         if session_obj:
@@ -138,6 +148,7 @@ def delete_session(session_id):
     Returns:
         bool: True if deleted successfully, False if not found
     """
+    session = get_current_session()
     try:
         session_obj = session.query(Session).filter_by(id=session_id).first()
         if session_obj:
@@ -161,6 +172,7 @@ def list_all_sessions():
     Returns:
         list: List of Session objects
     """
+    session = get_current_session()
     try:
         sessions = session.query(Session).all()
         logger.info(f"Retrieved {len(sessions)} sessions from database")

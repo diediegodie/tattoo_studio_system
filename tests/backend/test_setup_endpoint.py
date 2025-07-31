@@ -9,6 +9,8 @@ Run with pytest.
 
 import pytest
 import json
+import pytest
+import json
 from unittest.mock import patch
 from backend.app_factory import create_app
 from backend.database.models.base import Base
@@ -19,9 +21,9 @@ class TestSetupEndpoint:
     """Test cases for the database setup endpoint."""
 
     @pytest.fixture
-    def test_app(self, test_engine):
-        """Create test app with test engine."""
-        # Create app with test configuration
+    def test_app(self, test_engine, test_session):
+        """Create test app with test engine and session."""
+        Base.metadata.create_all(bind=test_engine)
         app = create_app(
             config_overrides={
                 "TESTING": True,
@@ -29,20 +31,10 @@ class TestSetupEndpoint:
                 "DB_URL": "sqlite:///:memory:",
             }
         )
-
-        # Override the global engine with our test engine
         with patch("backend.routes.setup.global_db", test_engine):
             with patch("backend.routes.setup.get_session") as mock_get_session:
-                # Create a test session
-                from sqlalchemy.orm import sessionmaker
-
-                SessionLocal = sessionmaker(bind=test_engine)
-                test_session = SessionLocal()
                 mock_get_session.return_value = test_session
-
                 yield app, test_session
-
-                test_session.close()
 
     def test_setup_database_endpoint_normal_case(self, test_app, test_engine):
         """Test the setup database endpoint - normal case."""

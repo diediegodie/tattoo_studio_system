@@ -44,14 +44,16 @@ def init_session():
 
 def get_session():
     """Get a new database session."""
+    if Session is None:
+        raise RuntimeError("Session factory is not initialized. Call init_session() first.")
     return Session()
 
 
 def close_session():
     """Close the current session."""
     if session:
-        # Handle both scoped_session (has remove()) and regular session (has close())
-        if hasattr(session, "remove"):
-            session.remove()
+        # Reason: remove() should be called on the scoped_session object, not the session instance
+        if Session is not None and hasattr(Session, "remove"):
+            Session.remove()
         elif hasattr(session, "close"):
             session.close()

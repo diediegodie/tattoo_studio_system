@@ -59,8 +59,8 @@ def test_create_session_normal_case(client):
         "client_id": client_id,
         "artist_id": artist_id,
         "date": date_str,
-        "status": "planned",
-        "notes": "First session",
+        "status": "scheduled",
+        "notes": "First session"
     }
     response = client.post(
         "/api/sessions/", data=json.dumps(data), content_type="application/json"
@@ -69,7 +69,8 @@ def test_create_session_normal_case(client):
     resp_data = json.loads(response.data)
     assert resp_data["session"]["client_id"] == client_id
     assert resp_data["session"]["artist_id"] == artist_id
-    assert resp_data["session"]["status"] == "planned"
+    assert resp_data["session"]["status"] == "scheduled"
+    assert resp_data["session"]["notes"] == "First session"
 
 
 def test_create_session_edge_case(client):
@@ -135,9 +136,7 @@ def test_get_session_normal_case(client):
     date_str = (datetime.now() + timedelta(days=3)).isoformat()
     post_resp = client.post(
         "/api/sessions/",
-        data=json.dumps(
-            {"client_id": client_id, "artist_id": artist_id, "date": date_str}
-        ),
+        data=json.dumps({"client_id": client_id, "artist_id": artist_id, "date": date_str}),
         content_type="application/json",
     )
     session_id = json.loads(post_resp.data)["session"]["id"]
