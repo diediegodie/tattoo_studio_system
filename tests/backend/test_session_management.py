@@ -8,7 +8,7 @@ Following the project guidelines for testing.
 import pytest
 import os
 import tempfile
-from backend.database.models import get_session, close_session, initialize_database
+from backend.database import get_session, close_session, initialize_database
 
 
 class TestSessionManagement:
@@ -21,15 +21,18 @@ class TestSessionManagement:
         self.temp_db.close()
 
         # Override database path for testing
-        import backend.database.models as models
+        import backend.database.models.base as base_models
 
-        self.original_db_path = models.DB_PATH
-        models.DB_PATH = self.temp_db.name
+        self.original_db_path = base_models.DB_PATH
+        base_models.DB_PATH = self.temp_db.name
 
         # Recreate engine and session with new path
-        models.db = models.create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
-        models.Session = models.sessionmaker(bind=models.db)
-        models.session = models.Session()
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        base_models.db = create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
+        base_models.Session = sessionmaker(bind=base_models.db)
+        base_models.session = base_models.Session()
 
         # Initialize database
         initialize_database()
@@ -37,15 +40,15 @@ class TestSessionManagement:
     def teardown_method(self):
         """Clean up after each test."""
         # Close session and restore original database path
-        import backend.database.models as models
+        import backend.database.models.base as base_models
 
         try:
-            models.session.close()
+            base_models.session.close()
         except Exception:
             pass
 
         # Restore original database path
-        models.DB_PATH = self.original_db_path
+        base_models.DB_PATH = self.original_db_path
 
         # Remove temporary database file
         try:
@@ -104,9 +107,11 @@ class TestSessionManagement:
 
         # Operations should still work because they use their own session management
         try:
+            from backend.database import create_user, list_all_users
+
             user = create_user("Test User After Close", birth=1990)
             assert user is not None
-            assert user.name == "Test User After Close"
+            assert getattr(user, "name", None) == "Test User After Close"
 
             users = list_all_users()
             assert len(users) >= 1

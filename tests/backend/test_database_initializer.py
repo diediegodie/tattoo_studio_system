@@ -13,7 +13,7 @@ import os
 import pytest
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import OperationalError
-from backend.database import models
+from backend.database.models.base import Base
 from services.database_initializer import initialize_database
 
 TEST_DB_PATH = "test_initializer.db"
@@ -25,7 +25,7 @@ def temp_db(monkeypatch):
     # Setup: create a new SQLite DB for each test
     engine = create_engine(TEST_DB_URI)
     monkeypatch.setattr("services.database_initializer.engine", engine)
-    models.Base.metadata.drop_all(bind=engine)
+    Base.metadata.drop_all(bind=engine)
     yield engine
     # Teardown: remove test DB file
     engine.dispose()
@@ -38,17 +38,17 @@ def test_initialize_database_normal(temp_db):
     result = initialize_database()
     assert result["status"] == "SUCCESS"
     assert isinstance(result["created_tables"], list)
-    assert set(result["created_tables"]) == set(models.Base.metadata.tables.keys())
+    assert set(result["created_tables"]) == set(Base.metadata.tables.keys())
 
     # Tables now exist
     inspector = inspect(temp_db)
-    for table in models.Base.metadata.tables:
+    for table in Base.metadata.tables:
         assert inspector.has_table(table)
 
 
 def test_initialize_database_edge(temp_db):
     # Create one table manually
-    tables = list(models.Base.metadata.tables.values())
+    tables = list(Base.metadata.tables.values())
     tables[0].create(bind=temp_db)
     # Now run initializer
     result = initialize_database()
@@ -58,7 +58,7 @@ def test_initialize_database_edge(temp_db):
         assert tables[0].name not in result["created_tables"]
     # All tables should exist
     inspector = inspect(temp_db)
-    for table in models.Base.metadata.tables:
+    for table in Base.metadata.tables:
         assert inspector.has_table(table)
 
 

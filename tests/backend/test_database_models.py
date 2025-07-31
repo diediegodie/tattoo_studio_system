@@ -8,8 +8,12 @@ Following the project guidelines for testing.
 import pytest
 import os
 import tempfile
-from backend.database.models import (
+from datetime import datetime
+from backend.database import (
     User,
+    Client,
+    Artist,
+    Session,
     initialize_database,
     create_user,
     read_user,
@@ -17,6 +21,21 @@ from backend.database.models import (
     update_user,
     delete_user,
     list_all_users,
+    create_client,
+    read_client,
+    update_client,
+    delete_client,
+    list_all_clients,
+    create_artist,
+    read_artist,
+    update_artist,
+    delete_artist,
+    list_all_artists,
+    create_session,
+    read_session,
+    update_session,
+    delete_session,
+    list_all_sessions,
 )
 
 
@@ -30,26 +49,49 @@ class TestUserModel:
         self.temp_db.close()
 
         # Override database path for testing
-        import backend.database.models as models
+        import backend.database.models.base as base_models
 
-        self.original_db_path = models.DB_PATH
-        models.DB_PATH = self.temp_db.name
+        self.original_db_path = base_models.DB_PATH
+        base_models.DB_PATH = self.temp_db.name
 
         # Recreate engine and session with new path
-        models.db = models.create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
-        models.Session = models.sessionmaker(bind=models.db)
-        models.session = models.Session()
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
-        # Initialize database
-        initialize_database()
+        base_models.db = create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
+        base_models.Session = sessionmaker(bind=base_models.db)
+        base_models.session = base_models.Session()
+
+        # Update the session in all model modules
+        from backend.database.models import (
+            user_model,
+            client_model,
+            artist_model,
+            session_model,
+        )
+
+        user_model.session = base_models.session
+        client_model.session = base_models.session
+        artist_model.session = base_models.session
+        session_model.session = base_models.session
+
+        # Initialize database - ensure all models are imported first
+        # This imports the models so their metadata is registered with Base
+        from backend.database.models.user_model import User
+        from backend.database.models.client_model import Client
+        from backend.database.models.artist_model import Artist
+        from backend.database.models.session_model import Session
+
+        # Now create the tables
+        base_models.Base.metadata.create_all(bind=base_models.db)
 
     def teardown_method(self):
         """Clean up after each test."""
         # Close session and restore original database path
-        import backend.database.models as models
+        import backend.database.models.base as base_models
 
-        models.session.close()
-        models.DB_PATH = self.original_db_path
+        base_models.session.close()
+        base_models.DB_PATH = self.original_db_path
 
         # Remove temporary database
         if os.path.exists(self.temp_db.name):
@@ -182,9 +224,15 @@ class TestUserModel:
 
         assert user1 is not None
         assert user2 is not None
-        assert getattr(user1, "name", None) == getattr(user2, "name", None) == "John Smith"
-        assert getattr(user1, "id", None) != getattr(user2, "id", None)  # IDs must be different
-        assert getattr(user1, "birth", None) != getattr(user2, "birth", None)  # Different birth years
+        assert (
+            getattr(user1, "name", None) == getattr(user2, "name", None) == "John Smith"
+        )
+        assert getattr(user1, "id", None) != getattr(
+            user2, "id", None
+        )  # IDs must be different
+        assert getattr(user1, "birth", None) != getattr(
+            user2, "birth", None
+        )  # Different birth years
 
         # Verify both users exist in database
         retrieved_user1 = read_user(getattr(user1, "id", None))
@@ -192,4 +240,231 @@ class TestUserModel:
 
         assert getattr(retrieved_user1, "name", None) == "John Smith"
         assert getattr(retrieved_user2, "name", None) == "John Smith"
-        assert getattr(retrieved_user1, "id", None) != getattr(retrieved_user2, "id", None)
+        assert getattr(retrieved_user1, "id", None) != getattr(
+            retrieved_user2, "id", None
+        )
+
+
+class TestClientModel:
+    """Test cases for Client model and CRUD operations."""
+
+    def setup_method(self):
+        """Set up test database before each test."""
+        # Create a temporary database for testing
+        self.temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.temp_db.close()
+
+        # Override database path for testing
+        import backend.database.models.base as base_models
+
+        self.original_db_path = base_models.DB_PATH
+        base_models.DB_PATH = self.temp_db.name
+
+        # Create new engine and session for test database
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        # Update engine and session in base module
+        base_models.db = create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
+        base_models.Session = sessionmaker(bind=base_models.db)
+        base_models.session = base_models.Session()
+
+        # Update the session in all model modules
+        from backend.database.models import (
+            user_model,
+            client_model,
+            artist_model,
+            session_model,
+        )
+
+        user_model.session = base_models.session
+        client_model.session = base_models.session
+        artist_model.session = base_models.session
+        session_model.session = base_models.session
+
+        # Create all tables
+        base_models.Base.metadata.create_all(base_models.db)
+
+    def teardown_method(self):
+        """Clean up after each test."""
+        import backend.database.models.base as base_models
+
+        base_models.session.close()
+        base_models.DB_PATH = self.original_db_path
+
+        if os.path.exists(self.temp_db.name):
+            os.unlink(self.temp_db.name)
+
+    def test_create_client_normal_case(self):
+        """Test creating a client with normal parameters."""
+        client = create_client("John Doe", phone="123-456-7890", address="123 Main St")
+
+        assert client is not None
+        assert getattr(client, "name", None) == "John Doe"
+        assert getattr(client, "phone", None) == "123-456-7890"
+        assert getattr(client, "address", None) == "123 Main St"
+        assert getattr(client, "id", None) is not None
+
+    def test_create_client_edge_case(self):
+        """Test creating a client with minimal data."""
+        client = create_client("Jane Smith")
+
+        assert client is not None
+        assert getattr(client, "name", None) == "Jane Smith"
+        assert getattr(client, "phone", None) is None
+
+    def test_create_client_failure_case(self):
+        """Test creating a client with invalid data."""
+        with pytest.raises(Exception):
+            create_client(None)
+
+    def test_read_client_normal_case(self):
+        """Test reading an existing client."""
+        created_client = create_client("Alice Johnson", phone="555-0123")
+        read_client_result = read_client(created_client.id)
+
+        assert read_client_result is not None
+        assert getattr(read_client_result, "name", None) == "Alice Johnson"
+        assert getattr(read_client_result, "phone", None) == "555-0123"
+
+
+class TestArtistModel:
+    """Test cases for Artist model and CRUD operations."""
+
+    def setup_method(self):
+        """Set up test database before each test."""
+        # Create a temporary database for testing
+        self.temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.temp_db.close()
+
+        # Override database path for testing
+        import backend.database.models.base as base_models
+
+        self.original_db_path = base_models.DB_PATH
+        base_models.DB_PATH = self.temp_db.name
+
+        # Create new engine and session for test database
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        # Update engine and session in base module
+        base_models.db = create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
+        base_models.Session = sessionmaker(bind=base_models.db)
+        base_models.session = base_models.Session()
+
+        # Update the session in all model modules
+        from backend.database.models import (
+            user_model,
+            client_model,
+            artist_model,
+            session_model,
+        )
+
+        user_model.session = base_models.session
+        client_model.session = base_models.session
+        artist_model.session = base_models.session
+        session_model.session = base_models.session
+
+        # Create all tables
+        base_models.Base.metadata.create_all(base_models.db)
+
+    def teardown_method(self):
+        """Clean up after each test."""
+        import backend.database.models.base as base_models
+
+        base_models.session.close()
+        base_models.DB_PATH = self.original_db_path
+
+        if os.path.exists(self.temp_db.name):
+            os.unlink(self.temp_db.name)
+
+    def test_create_artist_normal_case(self):
+        """Test creating an artist with normal parameters."""
+        artist = create_artist(
+            "Bob Wilson", email="bob.wilson@example.com", bio="Tattoo artist"
+        )
+
+        assert artist is not None
+        assert getattr(artist, "name", None) == "Bob Wilson"
+        assert getattr(artist, "email", None) == "bob.wilson@example.com"
+        assert getattr(artist, "bio", None) == "Tattoo artist"
+
+    def test_create_artist_edge_case(self):
+        """Test creating an artist with minimal data."""
+        artist = create_artist("Charlie Brown")
+
+        assert artist is not None
+        assert getattr(artist, "name", None) == "Charlie Brown"
+        assert getattr(artist, "email", None) is None
+
+
+class TestSessionModel:
+    """Test cases for Session model and CRUD operations."""
+
+    def setup_method(self):
+        """Set up test database before each test."""
+        # Create a temporary database for testing
+        self.temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.temp_db.close()
+
+        # Override database path for testing
+        import backend.database.models.base as base_models
+
+        self.original_db_path = base_models.DB_PATH
+        base_models.DB_PATH = self.temp_db.name
+
+        # Create new engine and session for test database
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        # Update engine and session in base module
+        base_models.db = create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
+        base_models.Session = sessionmaker(bind=base_models.db)
+        base_models.session = base_models.Session()
+
+        # Update the session in all model modules
+        from backend.database.models import (
+            user_model,
+            client_model,
+            artist_model,
+            session_model,
+        )
+
+        user_model.session = base_models.session
+        client_model.session = base_models.session
+        artist_model.session = base_models.session
+        session_model.session = base_models.session
+
+        # Create all tables
+        base_models.Base.metadata.create_all(base_models.db)
+
+        # Create test client and artist for session tests
+        self.test_client = create_client("Test Client")
+        self.test_artist = create_artist("Test Artist")
+
+    def teardown_method(self):
+        """Clean up after each test."""
+        import backend.database.models.base as base_models
+
+        base_models.session.close()
+        base_models.DB_PATH = self.original_db_path
+
+        if os.path.exists(self.temp_db.name):
+            os.unlink(self.temp_db.name)
+
+    def test_create_session_normal_case(self):
+        """Test creating a session with normal parameters."""
+        session_date = datetime(2025, 8, 1, 10, 0)
+        session_obj = create_session(
+            self.test_client.id,
+            self.test_artist.id,
+            session_date,
+            status="planned",
+            notes="Initial consultation",
+        )
+
+        assert session_obj is not None
+        assert getattr(session_obj, "client_id", None) == self.test_client.id
+        assert getattr(session_obj, "artist_id", None) == self.test_artist.id
+        assert getattr(session_obj, "status", None) == "planned"
+        assert getattr(session_obj, "notes", None) == "Initial consultation"

@@ -1,25 +1,12 @@
 """
-Database models for Tattoo Studio Management System.
-
-This module defines SQLAlchemy models and CRUD operations for the application.
-Following the project structure with feature-based organization.
+User model and CRUD operations.
 """
 
-from sqlalchemy import create_engine, Column, String, Integer, Boolean
-from sqlalchemy.orm import sessionmaker, declarative_base
-import os
+from sqlalchemy import Column, String, Integer, Boolean
+from .base import Base, session
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
-
-# Database configuration
-DB_PATH = os.path.join(os.path.dirname(__file__), "tattoo_system.db")
-db = create_engine(f"sqlite:///{DB_PATH}", echo=False)
-
-Session = sessionmaker(bind=db)
-session = Session()
-
-Base = declarative_base()
 
 
 class User(Base):
@@ -47,17 +34,6 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(id={self.id}, name='{self.name}', birth={self.birth})>"
-
-
-# Create all tables
-def initialize_database():
-    """Initialize the database by creating all tables."""
-    try:
-        Base.metadata.create_all(bind=db)
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing database: {e}")
-        raise
 
 
 # CRUD operations for User
@@ -204,18 +180,3 @@ def list_all_users(active_only=True):
     except Exception as e:
         logger.error(f"Error listing users: {e}")
         raise
-
-
-# Database session management
-def get_session():
-    """Get a new database session."""
-    return Session()
-
-
-def close_session():
-    """Close the current session."""
-    try:
-        session.close()
-        logger.info("Database session closed")
-    except Exception as e:
-        logger.error(f"Error closing session: {e}")

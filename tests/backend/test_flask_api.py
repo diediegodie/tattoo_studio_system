@@ -10,7 +10,7 @@ import json
 import tempfile
 import os
 from backend.app import app
-from backend.database.models import initialize_database
+from backend.database import initialize_database
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -27,15 +27,15 @@ def client():
     app.config["DEBUG"] = False
 
     # Override database path for testing
-    import backend.database.models as models
+    import backend.database.models.base as base_models
 
-    original_db_path = models.DB_PATH
-    models.DB_PATH = temp_db.name
+    original_db_path = base_models.DB_PATH
+    base_models.DB_PATH = temp_db.name
 
     # Recreate engine and session with new path
-    models.db = models.create_engine(f"sqlite:///{temp_db.name}", echo=False)
-    models.Session = models.sessionmaker(bind=models.db)
-    models.session = models.Session()
+    base_models.db = create_engine(f"sqlite:///{temp_db.name}", echo=False)
+    base_models.Session = sessionmaker(bind=base_models.db)
+    base_models.session = base_models.Session()
 
     with app.test_client() as client:
         with app.app_context():
@@ -43,8 +43,8 @@ def client():
         yield client
 
     # Cleanup
-    models.session.close()
-    models.DB_PATH = original_db_path  # Restore original path
+    base_models.session.close()
+    base_models.DB_PATH = original_db_path  # Restore original path
     if os.path.exists(temp_db.name):
         os.unlink(temp_db.name)
 

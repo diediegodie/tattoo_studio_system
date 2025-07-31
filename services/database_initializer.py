@@ -9,7 +9,7 @@ Follows project structure and logging conventions.
 """
 
 from sqlalchemy import inspect
-from backend.database import models
+from backend.database.models.base import Base
 from backend.database import engine  # Assumes engine is exposed in database/__init__.py
 from utils.logger import setup_logger
 from datetime import datetime
@@ -32,7 +32,7 @@ def initialize_database():
     already_exists = []
     try:
         inspector = inspect(engine)
-        metadata = models.Base.metadata
+        metadata = Base.metadata
         for table_name, table in metadata.tables.items():
             if inspector.has_table(table_name):
                 already_exists.append(table_name)
