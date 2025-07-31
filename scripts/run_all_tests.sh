@@ -2,7 +2,6 @@
 # Always use the venv Python for tests
 
 VENV_PYTHON="./.venv/bin/python"
-VENV_PYTEST="./.venv/bin/pytest"
 
 if [ ! -x "$VENV_PYTHON" ]; then
   echo "Virtual environment not found! Please create it and install dependencies."
@@ -10,7 +9,10 @@ if [ ! -x "$VENV_PYTHON" ]; then
 fi
 
 echo "Running backend tests..."
-PYTHONPATH="$(pwd)" "$VENV_PYTEST" -v tests/backend/
+PYTHONPATH="$(pwd)" pytest -v tests/backend/
 
 echo "Running frontend tests..."
-PYTHONPATH="$(pwd)" "$VENV_PYTEST" -v tests/frontend/
+PYTHONPATH="$(pwd)" pytest -v tests/frontend/
+
+echo "Running integration tests..."
+PYTHONPATH="$(pwd)" pytest -v tests/integration/

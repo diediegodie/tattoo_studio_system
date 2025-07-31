@@ -28,6 +28,9 @@ from backend.database import (
 from utils.logger import setup_logger
 from configs.config import AppConfig
 
+# Import and register setup blueprint
+from backend.routes.setup import setup_bp
+
 # Initialize logger and config
 logger = setup_logger(__name__)
 config = AppConfig()
@@ -47,6 +50,9 @@ with app.app_context():
     except Exception as e:
         logger.error(f"Failed to initialize application: {e}")
         raise
+
+# Register setup blueprint for database setup endpoint
+app.register_blueprint(setup_bp)
 
 
 @app.route("/health", methods=["GET"])

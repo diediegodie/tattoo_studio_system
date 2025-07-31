@@ -52,6 +52,36 @@ def client():
 class TestFlaskAPI:
     """Test cases for Flask API endpoints."""
 
+    def test_setup_database_normal_case(self, client, monkeypatch):
+        """Test normal case: database setup endpoint in debug mode."""
+        # Reason: Ensure endpoint works and returns success JSON
+        monkeypatch.setenv("DEBUG", "true")
+        # Reload config in route if needed (if config is cached, may need to patch importlib.reload)
+        response = client.post("/api/setup/database")
+        data = json.loads(response.data)
+        assert response.status_code == 200
+        assert data["status"] == "SUCCESS"
+        assert "timestamp" in data
+        assert "created_tables" in data
+
+    def test_setup_database_edge_case_already_exists(self, client, monkeypatch):
+        """Test edge case: endpoint called when tables already exist."""
+        monkeypatch.setenv("DEBUG", "true")
+        # Call twice to ensure idempotency
+        client.post("/api/setup/database")
+        response = client.post("/api/setup/database")
+        data = json.loads(response.data)
+        assert response.status_code == 200
+        assert data["status"] == "SUCCESS"
+        assert data["created_tables"] == "ALREADY EXISTS"
+
+    def test_setup_database_failure_case_not_debug(self, client, monkeypatch):
+        """Test failure case: endpoint not available if not in debug mode."""
+        monkeypatch.setenv("DEBUG", "false")
+        response = client.post("/api/setup/database")
+        assert response.status_code == 403
+        # Flask abort returns HTML by default, so no JSON expected
+
     def test_health_check_normal_case(self, client):
         """Test the health check endpoint."""
         # Reason: Verify basic app functionality

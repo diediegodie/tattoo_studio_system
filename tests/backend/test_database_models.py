@@ -61,10 +61,10 @@ class TestUserModel:
         user = create_user("John Doe", birth=1990)
 
         assert user is not None
-        assert user.name == "John Doe"
-        assert user.birth == 1990
-        assert user.active is True
-        assert user.id is not None
+        assert getattr(user, "name", None) == "John Doe"
+        assert getattr(user, "birth", None) == 1990
+        assert getattr(user, "active", None) is True
+        assert getattr(user, "id", None) is not None
 
     def test_create_user_edge_case(self):
         """Test creating a user with minimal data."""
@@ -72,9 +72,9 @@ class TestUserModel:
         user = create_user("Jane Smith")
 
         assert user is not None
-        assert user.name == "Jane Smith"
-        assert user.birth is None
-        assert user.active is True
+        assert getattr(user, "name", None) == "Jane Smith"
+        assert getattr(user, "birth", None) is None
+        assert getattr(user, "active", None) is True
 
     def test_create_user_failure_case(self):
         """Test creating a user with invalid data."""
@@ -91,8 +91,8 @@ class TestUserModel:
         read_user_result = read_user(created_user.id)
 
         assert read_user_result is not None
-        assert read_user_result.name == "Alice Johnson"
-        assert read_user_result.birth == 1985
+        assert getattr(read_user_result, "name", None) == "Alice Johnson"
+        assert getattr(read_user_result, "birth", None) == 1985
 
     def test_read_user_edge_case(self):
         """Test reading a non-existent user."""
@@ -109,8 +109,8 @@ class TestUserModel:
         result = read_user_by_name("Bob Wilson")
 
         assert result is not None
-        assert result.name == "Bob Wilson"
-        assert result.birth == 1988
+        assert getattr(result, "name", None) == "Bob Wilson"
+        assert getattr(result, "birth", None) == 1988
 
     def test_update_user_normal_case(self):
         """Test updating user information."""
@@ -121,8 +121,8 @@ class TestUserModel:
         updated_user = update_user(user.id, name="Charles Brown", birth=1993)
 
         assert updated_user is not None
-        assert updated_user.name == "Charles Brown"
-        assert updated_user.birth == 1993
+        assert getattr(updated_user, "name", None) == "Charles Brown"
+        assert getattr(updated_user, "birth", None) == 1993
 
     def test_update_user_edge_case(self):
         """Test updating non-existent user."""
@@ -182,14 +182,14 @@ class TestUserModel:
 
         assert user1 is not None
         assert user2 is not None
-        assert user1.name == user2.name == "John Smith"
-        assert user1.id != user2.id  # IDs must be different
-        assert user1.birth != user2.birth  # Different birth years
+        assert getattr(user1, "name", None) == getattr(user2, "name", None) == "John Smith"
+        assert getattr(user1, "id", None) != getattr(user2, "id", None)  # IDs must be different
+        assert getattr(user1, "birth", None) != getattr(user2, "birth", None)  # Different birth years
 
         # Verify both users exist in database
-        retrieved_user1 = read_user(user1.id)
-        retrieved_user2 = read_user(user2.id)
+        retrieved_user1 = read_user(getattr(user1, "id", None))
+        retrieved_user2 = read_user(getattr(user2, "id", None))
 
-        assert retrieved_user1.name == "John Smith"
-        assert retrieved_user2.name == "John Smith"
-        assert retrieved_user1.id != retrieved_user2.id
+        assert getattr(retrieved_user1, "name", None) == "John Smith"
+        assert getattr(retrieved_user2, "name", None) == "John Smith"
+        assert getattr(retrieved_user1, "id", None) != getattr(retrieved_user2, "id", None)

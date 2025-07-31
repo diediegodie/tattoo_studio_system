@@ -15,6 +15,7 @@ from .models import (
     list_all_users,
     get_session,
     close_session,
+    db as engine,  # Expose db as engine for compatibility
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "list_all_users",
     "get_session",
     "close_session",
+    "engine",
 ]
