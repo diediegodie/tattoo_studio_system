@@ -3,7 +3,7 @@ Client model and CRUD operations.
 """
 
 from sqlalchemy import Column, String, Integer
-from .base import Base, session
+from .base import Base, get_session
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -71,6 +71,7 @@ def create_client(
     Returns:
         Client: The created client object
     """
+    session = get_session()
     try:
         client = Client(
             name=name,
@@ -88,6 +89,8 @@ def create_client(
         session.rollback()
         logger.error(f"Error creating client: {e}")
         raise
+    finally:
+        session.close()
 
 
 def read_client(client_id):
@@ -100,6 +103,7 @@ def read_client(client_id):
     Returns:
         Client: The client object or None if not found
     """
+    session = get_session()
     try:
         client = session.query(Client).filter_by(id=client_id).first()
         if client:
@@ -110,6 +114,8 @@ def read_client(client_id):
     except Exception as e:
         logger.error(f"Error reading client: {e}")
         raise
+    finally:
+        session.close()
 
 
 def update_client(client_id, **kwargs):
@@ -123,6 +129,7 @@ def update_client(client_id, **kwargs):
     Returns:
         Client: The updated client object or None if not found
     """
+    session = get_session()
     try:
         client = session.query(Client).filter_by(id=client_id).first()
         if client:
@@ -139,6 +146,8 @@ def update_client(client_id, **kwargs):
         session.rollback()
         logger.error(f"Error updating client: {e}")
         raise
+    finally:
+        session.close()
 
 
 def delete_client(client_id):
@@ -151,6 +160,7 @@ def delete_client(client_id):
     Returns:
         bool: True if deleted successfully, False if not found
     """
+    session = get_session()
     try:
         client = session.query(Client).filter_by(id=client_id).first()
         if client:
@@ -165,6 +175,8 @@ def delete_client(client_id):
         session.rollback()
         logger.error(f"Error deleting client: {e}")
         raise
+    finally:
+        session.close()
 
 
 def list_all_clients():
@@ -174,6 +186,7 @@ def list_all_clients():
     Returns:
         list: List of Client objects
     """
+    session = get_session()
     try:
         clients = session.query(Client).all()
         logger.info(f"Retrieved {len(clients)} clients from database")
@@ -181,3 +194,5 @@ def list_all_clients():
     except Exception as e:
         logger.error(f"Error listing clients: {e}")
         raise
+    finally:
+        session.close()

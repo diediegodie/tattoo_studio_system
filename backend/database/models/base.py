@@ -4,21 +4,42 @@ Base model for SQLAlchemy.
 This module defines the declarative base, engine, and session for the database.
 """
 
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from utils.logger import setup_logger
+from sqlalchemy.orm.scoping import scoped_session
+from configs.config import config
+import urllib.parse
 
-logger = setup_logger(__name__)
 
-# Database configuration
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "tattoo_system.db")
-db = create_engine(f"sqlite:///{DB_PATH}", echo=False)
+# These will be initialized by the application factory
+db = None
+Session = None
+session = None
 
-Session = sessionmaker(bind=db)
-session = Session()
+# DB_PATH for logs, backup, and test utilities
+DB_PATH = None
+if config.DB_URL:
+    if config.DB_URL.startswith("sqlite:///"):
+        # Extract file path from sqlite URI
+        parsed = urllib.parse.urlparse(config.DB_URL)
+        DB_PATH = parsed.path.lstrip("/")
+    else:
+        DB_PATH = config.DB_URL
 
 Base = declarative_base()
+
+
+def init_engine(db_url, **kwargs):
+    """Initializes the database engine."""
+    global db
+    db = create_engine(db_url, **kwargs)
+
+
+def init_session():
+    """Initializes the database session factory."""
+    global Session, session
+    Session = scoped_session(sessionmaker(bind=db))
+    session = Session()
 
 
 def get_session():
@@ -28,8 +49,9 @@ def get_session():
 
 def close_session():
     """Close the current session."""
-    try:
-        session.close()
-        logger.info("Database session closed")
-    except Exception as e:
-        logger.error(f"Error closing session: {e}")
+    if session:
+        # Handle both scoped_session (has remove()) and regular session (has close())
+        if hasattr(session, "remove"):
+            session.remove()
+        elif hasattr(session, "close"):
+            session.close()

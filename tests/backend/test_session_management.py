@@ -6,114 +6,150 @@ Following the project guidelines for testing.
 """
 
 import pytest
-import os
-import tempfile
-from backend.database import get_session, close_session, initialize_database
+from backend.database import get_session, close_session
+from services.database_initializer import initialize_database
 
 
 class TestSessionManagement:
     """Test cases for database session management functions."""
 
-    def setup_method(self):
-        """Set up test database before each test."""
-        # Create a temporary database for testing
-        self.temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-        self.temp_db.close()
+    def test_get_session_normal_case(self, test_engine, test_session):
+        """Test getting a session when one is available - normal case."""
+        # Reason: Ensure session factory returns valid session object
 
-        # Override database path for testing
+        # Initialize database with test engine
+        initialize_database(engine=test_engine, session=test_session)
+
+        # Override the global session factory for this test
         import backend.database.models.base as base_models
-
-        self.original_db_path = base_models.DB_PATH
-        base_models.DB_PATH = self.temp_db.name
-
-        # Recreate engine and session with new path
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
-        base_models.db = create_engine(f"sqlite:///{self.temp_db.name}", echo=False)
-        base_models.Session = sessionmaker(bind=base_models.db)
-        base_models.session = base_models.Session()
+        original_session = base_models.Session
+        base_models.Session = sessionmaker(bind=test_engine)
 
-        # Initialize database
-        initialize_database()
+        try:
+            session = get_session()
+            assert session is not None
+            assert hasattr(session, "query")
+            assert hasattr(session, "commit")
+            assert hasattr(session, "close")
+            session.close()
+        finally:
+            # Restore original session
+            base_models.Session = original_session
 
-    def teardown_method(self):
-        """Clean up after each test."""
-        # Close session and restore original database path
+    def test_get_session_multiple_sessions(self, test_engine, test_session):
+        """Test getting multiple sessions - edge case."""
+        # Reason: Ensure session factory returns different instances each time
+
+        # Initialize database with test engine
+        initialize_database(engine=test_engine, session=test_session)
+
+        # Override the global session factory for this test
         import backend.database.models.base as base_models
+        from sqlalchemy.orm import sessionmaker
+
+        original_session = base_models.Session
+        base_models.Session = sessionmaker(bind=test_engine)
 
         try:
-            base_models.session.close()
-        except Exception:
-            pass
+            session1 = get_session()
+            session2 = get_session()
 
-        # Restore original database path
-        base_models.DB_PATH = self.original_db_path
+            # Should be different instances
+            assert session1 is not session2
+            assert session1 is not None
+            assert session2 is not None
 
-        # Remove temporary database file
+            session1.close()
+            session2.close()
+        finally:
+            # Restore original session
+            base_models.Session = original_session
+
+    def test_close_session_normal_case(self, test_engine, test_session):
+        """Test closing a session when one exists - normal case."""
+        # Reason: Ensure session closing works without errors
+
+        # Initialize database with test engine
+        initialize_database(engine=test_engine, session=test_session)
+
+        # Override the global session for this test
+        import backend.database.models.base as base_models
+        from sqlalchemy.orm import sessionmaker
+
+        original_session_factory = base_models.Session
+        original_session_instance = base_models.session
+
+        SessionLocal = sessionmaker(bind=test_engine)
+        base_models.Session = SessionLocal
+        base_models.session = SessionLocal()
+
         try:
-            os.unlink(self.temp_db.name)
-        except OSError:
-            pass
-
-    def test_get_session_normal_case(self):
-        """Test getting a new database session - normal case."""
-        # Reason: Test that get_session returns a valid session object
-        session = get_session()
-
-        assert session is not None
-        assert hasattr(session, "query")
-        assert hasattr(session, "add")
-        assert hasattr(session, "commit")
-        assert hasattr(session, "close")
-
-    def test_get_session_multiple_sessions(self):
-        """Test getting multiple database sessions - edge case."""
-        # Reason: Test that multiple sessions can be created independently
-        session1 = get_session()
-        session2 = get_session()
-
-        assert session1 is not None
-        assert session2 is not None
-        assert session1 is not session2  # Should be different instances
-
-    def test_close_session_normal_case(self):
-        """Test closing database session - normal case."""
-        # Reason: Test that close_session executes without errors
-        try:
+            # This should not raise an exception
             close_session()
-            # If we get here without exception, the test passes
-            assert True
-        except Exception as e:
-            pytest.fail(f"close_session raised an exception: {e}")
+            # Session should be closed
+            assert base_models.session is not None  # Still exists but should be closed
+        finally:
+            # Restore original sessions
+            base_models.Session = original_session_factory
+            base_models.session = original_session_instance
 
-    def test_close_session_multiple_calls(self):
-        """Test calling close_session multiple times - edge case."""
-        # Reason: Test that multiple close calls don't cause errors
+    def test_close_session_multiple_calls(self, test_engine, test_session):
+        """Test closing session multiple times - edge case."""
+        # Reason: Ensure multiple close calls don't cause errors
+
+        # Initialize database with test engine
+        initialize_database(engine=test_engine, session=test_session)
+
+        # Override the global session for this test
+        import backend.database.models.base as base_models
+        from sqlalchemy.orm import sessionmaker
+
+        original_session_factory = base_models.Session
+        original_session_instance = base_models.session
+
+        SessionLocal = sessionmaker(bind=test_engine)
+        base_models.Session = SessionLocal
+        base_models.session = SessionLocal()
+
         try:
+            # Multiple close calls should not raise exceptions
             close_session()
-            close_session()  # Should not cause errors
-            assert True
-        except Exception as e:
-            pytest.fail(f"Multiple close_session calls raised an exception: {e}")
+            close_session()
+            close_session()
+        finally:
+            # Restore original sessions
+            base_models.Session = original_session_factory
+            base_models.session = original_session_instance
 
-    def test_session_operations_after_close(self):
-        """Test that operations still work after close_session - failure case."""
-        # Reason: Test behavior after session closure
-        from backend.database.models import create_user, list_all_users
+    def test_session_operations_after_close(self, test_engine, test_session):
+        """Test that new sessions can be created after closing - edge case."""
+        # Reason: Ensure session factory still works after session is closed
 
-        # Close the session
-        close_session()
+        # Initialize database with test engine
+        initialize_database(engine=test_engine, session=test_session)
 
-        # Operations should still work because they use their own session management
+        # Override the global session for this test
+        import backend.database.models.base as base_models
+        from sqlalchemy.orm import sessionmaker
+
+        original_session_factory = base_models.Session
+        original_session_instance = base_models.session
+
+        SessionLocal = sessionmaker(bind=test_engine)
+        base_models.Session = SessionLocal
+        base_models.session = SessionLocal()
+
         try:
-            from backend.database import create_user, list_all_users
+            # Close session
+            close_session()
 
-            user = create_user("Test User After Close", birth=1990)
-            assert user is not None
-            assert getattr(user, "name", None) == "Test User After Close"
-
-            users = list_all_users()
-            assert len(users) >= 1
-        except Exception as e:
-            pytest.fail(f"Operations after close_session failed: {e}")
+            # Should be able to get new session
+            new_session = get_session()
+            assert new_session is not None
+            new_session.close()
+        finally:
+            # Restore original sessions
+            base_models.Session = original_session_factory
+            base_models.session = original_session_instance

@@ -3,7 +3,7 @@ Artist model and CRUD operations.
 """
 
 from sqlalchemy import Column, String, Integer
-from .base import Base, session
+from .base import Base, get_session
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -57,6 +57,7 @@ def create_artist(name, phone=None, email=None, bio=None, portfolio=None):
     Returns:
         Artist: The created artist object
     """
+    session = get_session()
     try:
         artist = Artist(
             name=name, phone=phone, email=email, bio=bio, portfolio=portfolio
@@ -69,6 +70,8 @@ def create_artist(name, phone=None, email=None, bio=None, portfolio=None):
         session.rollback()
         logger.error(f"Error creating artist: {e}")
         raise
+    finally:
+        session.close()
 
 
 def read_artist(artist_id):
@@ -81,6 +84,7 @@ def read_artist(artist_id):
     Returns:
         Artist: The artist object or None if not found
     """
+    session = get_session()
     try:
         artist = session.query(Artist).filter_by(id=artist_id).first()
         if artist:
@@ -91,6 +95,8 @@ def read_artist(artist_id):
     except Exception as e:
         logger.error(f"Error reading artist: {e}")
         raise
+    finally:
+        session.close()
 
 
 def update_artist(artist_id, **kwargs):
@@ -104,6 +110,7 @@ def update_artist(artist_id, **kwargs):
     Returns:
         Artist: The updated artist object or None if not found
     """
+    session = get_session()
     try:
         artist = session.query(Artist).filter_by(id=artist_id).first()
         if artist:
@@ -120,6 +127,8 @@ def update_artist(artist_id, **kwargs):
         session.rollback()
         logger.error(f"Error updating artist: {e}")
         raise
+    finally:
+        session.close()
 
 
 def delete_artist(artist_id):
@@ -132,6 +141,7 @@ def delete_artist(artist_id):
     Returns:
         bool: True if deleted successfully, False if not found
     """
+    session = get_session()
     try:
         artist = session.query(Artist).filter_by(id=artist_id).first()
         if artist:
@@ -146,6 +156,8 @@ def delete_artist(artist_id):
         session.rollback()
         logger.error(f"Error deleting artist: {e}")
         raise
+    finally:
+        session.close()
 
 
 def list_all_artists():
@@ -155,6 +167,7 @@ def list_all_artists():
     Returns:
         list: List of Artist objects
     """
+    session = get_session()
     try:
         artists = session.query(Artist).all()
         logger.info(f"Retrieved {len(artists)} artists from database")
@@ -162,3 +175,5 @@ def list_all_artists():
     except Exception as e:
         logger.error(f"Error listing artists: {e}")
         raise
+    finally:
+        session.close()

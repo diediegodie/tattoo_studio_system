@@ -3,7 +3,7 @@ User model and CRUD operations.
 """
 
 from sqlalchemy import Column, String, Integer, Boolean
-from .base import Base, session
+from .base import Base, get_session
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -49,6 +49,7 @@ def create_user(name, birth=None, active=True):
     Returns:
         User: The created user object
     """
+    session = get_session()
     try:
         user = User(name=name, birth=birth, active=active)
         session.add(user)
@@ -71,6 +72,7 @@ def read_user(user_id):
     Returns:
         User: The user object or None if not found
     """
+    session = get_session()
     try:
         user = session.query(User).filter_by(id=user_id).first()
         if user:
@@ -93,6 +95,7 @@ def read_user_by_name(name):
     Returns:
         User: The user object or None if not found
     """
+    session = get_session()
     try:
         user = session.query(User).filter_by(name=name).first()
         if user:
@@ -116,6 +119,7 @@ def update_user(user_id, **kwargs):
     Returns:
         User: The updated user object or None if not found
     """
+    session = get_session()
     try:
         user = session.query(User).filter_by(id=user_id).first()
         if user:
@@ -144,6 +148,7 @@ def delete_user(user_id):
     Returns:
         bool: True if deleted successfully, False if not found
     """
+    session = get_session()
     try:
         user = session.query(User).filter_by(id=user_id).first()
         if user:
@@ -170,6 +175,7 @@ def list_all_users(active_only=True):
     Returns:
         list: List of User objects
     """
+    session = get_session()
     try:
         if active_only:
             users = session.query(User).filter_by(active=True).all()

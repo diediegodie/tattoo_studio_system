@@ -34,20 +34,32 @@ from .models import (
 )
 
 
-def initialize_database():
-    """Initialize the database by creating all tables."""
-    try:
-        Base.metadata.create_all(bind=engine)
-        from utils.logger import setup_logger
+def initialize_database(engine=None, session=None):
+    """
+    Initialize the database by creating all tables.
 
-        logger = setup_logger(__name__)
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        from utils.logger import setup_logger
+    Args:
+        engine: SQLAlchemy engine instance. If None, tries to use global engine.
+        session: SQLAlchemy session instance. Optional.
 
-        logger = setup_logger(__name__)
-        logger.error(f"Error initializing database: {e}")
-        raise
+    Raises:
+        ValueError: If no engine is available
+    """
+    # Import the actual function from services
+    from services.database_initializer import initialize_database as _initialize_db
+
+    # If no engine provided, try to use the global engine
+    if engine is None:
+        engine = globals().get("engine")
+        if engine is None:
+            from .models.base import init_engine, init_session
+            from configs.config import config
+
+            init_engine(config.DB_URL)
+            init_session()
+            engine = globals().get("engine")
+
+    return _initialize_db(engine=engine, session=session)
 
 
 __all__ = [

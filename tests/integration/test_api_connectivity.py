@@ -5,11 +5,16 @@ This module tests the connection between the Flet frontend and Flask backend
 to ensure proper data flow and error handling.
 """
 
-import pytest
+# Ensure test isolation before any app/database import
+import os
+
+os.environ["TESTING"] = "1"
+os.environ["DB_URL"] = "sqlite:///:memory:"
+
+import sys
 import time
 import threading
-import sys
-import os
+import pytest
 
 # Add project root to Python path
 project_root = os.path.dirname(
@@ -37,9 +42,25 @@ class TestFrontendBackendIntegration:
     @classmethod
     def setup_class(cls):
         """Set up test environment with Flask app running."""
-        # Initialize database
+        # Initialize database with proper test engine
+        from tests.conftest import test_engine, test_session_factory
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        # Create test engine and session for integration tests
+        test_eng = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
+        SessionLocal = sessionmaker(bind=test_eng)
+        test_sess = SessionLocal()
+
         with app.app_context():
-            initialize_database()
+            # Import the function from services directly
+            from services.database_initializer import initialize_database
+
+            initialize_database(engine=test_eng, session=test_sess)
+
+        test_sess.close()
 
         # Start Flask app in test mode in a separate thread
         cls.flask_thread = threading.Thread(
