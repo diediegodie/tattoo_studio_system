@@ -33,6 +33,38 @@ config = AppConfig()
 
 
 class APIClient:
+    def login(self, email: str, password: str) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Authenticate user and obtain JWT token.
+        Args:
+            email (str): User email
+            password (str): User password
+        Returns:
+            Tuple[bool, Dict]: (success, response_data)
+            Response format: {"access_token": str, ...}
+        """
+        data = {"email": email, "password": password}
+        success, resp = self._make_request("POST", "/auth/login", json=data)
+        if success and "access_token" in resp:
+            self.set_token(resp["access_token"])
+        return success, resp
+
+    def register(
+        self, email: str, password: str, name: str, role: str = "staff"
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Register a new user account.
+        Args:
+            email (str): User email
+            password (str): User password
+            name (str): User name
+            role (str): User role (default: staff)
+        Returns:
+            Tuple[bool, Dict]: (success, response_data)
+        """
+        data = {"email": email, "password": password, "name": name, "role": role}
+        return self._make_request("POST", "/auth/register", json=data)
+
     """
     HTTP client for communicating with the Flask backend API.
 
@@ -56,7 +88,26 @@ class APIClient:
             {"Content-Type": "application/json", "Accept": "application/json"}
         )
 
+        # JWT token (in-memory)
+        self._jwt_token = None
+
         logger.info(f"API Client initialized with base URL: {self.base_url}")
+
+    def set_token(self, token: str):
+        """
+        Store JWT token in memory and set Authorization header.
+        Args:
+            token (str): JWT token string
+        """
+        self._jwt_token = token
+        self.session.headers.update({"Authorization": f"Bearer {token}"})
+
+    def clear_token(self):
+        """
+        Remove JWT token from memory and headers.
+        """
+        self._jwt_token = None
+        self.session.headers.pop("Authorization", None)
 
     def _make_request(
         self, method: str, endpoint: str, **kwargs
@@ -73,6 +124,15 @@ class APIClient:
             Tuple[bool, Dict]: (success_flag, response_data)
         """
         url = f"{self.base_url}{endpoint}"
+
+        # Attach JWT token to headers if present (for manual requests)
+        headers = kwargs.pop("headers", None)
+        if self._jwt_token:
+            if headers is None:
+                headers = {}
+            headers["Authorization"] = f"Bearer {self._jwt_token}"
+        if headers:
+            kwargs["headers"] = headers
 
         try:
             # Add timeout if not specified
@@ -92,6 +152,9 @@ class APIClient:
             if response.status_code >= 400:
                 error_msg = data.get("error", f"HTTP {response.status_code} error")
                 logger.warning(f"API request failed: {method} {url} - {error_msg}")
+                # If unauthorized, clear token
+                if response.status_code == 401:
+                    self.clear_token()
                 return False, {"error": error_msg, "status_code": response.status_code}
 
             logger.debug(f"API request successful: {method} {url}")

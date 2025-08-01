@@ -25,6 +25,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from frontend.pages.users import UserManagementPage
+from frontend.pages.login import login_page
 from frontend.utils.api_client import get_api_client
 from utils.logger import setup_logger
 
@@ -35,7 +36,6 @@ logger = setup_logger(__name__)
 class TattooStudioApp:
     """
     Main application class for the Tattoo Studio Management System.
-
     Manages navigation between different pages and handles the overall
     application state and lifecycle.
     """
@@ -46,10 +46,13 @@ class TattooStudioApp:
         self.user_page: Optional[UserManagementPage] = None
         logger.info("Tattoo Studio App initialized")
 
+        # JWT token (in-memory only)
+        self.jwt_token = None
+        self.is_authenticated = False
+
     def main(self, page: ft.Page):
         """
         Main application entry point called by Flet.
-
         Args:
             page (ft.Page): The main Flet page instance
         """
@@ -64,16 +67,78 @@ class TattooStudioApp:
         # Initialize pages
         self.user_page = UserManagementPage(page)
 
+        def handle_login(email, password):
+            """
+            Handle login: call API, store JWT, set auth state, redirect.
+            """
+            logger.info(f"Login attempt: {email}")
+            # Call backend /auth/login
+            success, resp = self.api_client._make_request(
+                "POST", "/auth/login", json={"email": email, "password": password}
+            )
+            if success and "access_token" in resp:
+                token = resp["access_token"]
+                self.jwt_token = token
+                self.api_client.set_token(token)
+                self.is_authenticated = True
+                logger.info("Login successful, JWT stored.")
+                snack = ft.SnackBar(ft.Text("Login successful!"), open=True)
+                page.overlay.append(snack)
+                page.update()
+                page.go("/users")
+            else:
+                error_msg = resp.get("error", "Login failed. Check credentials.")
+                logger.warning(f"Login failed: {error_msg}")
+                snack = ft.SnackBar(ft.Text(f"Login failed: {error_msg}"), open=True)
+                page.overlay.append(snack)
+                page.update()
+                page.go("/login")
+
+        def handle_register(email, password):
+            """
+            Handle register: call API, show result.
+            """
+            logger.info(f"Register attempt: {email}")
+            # Call backend /auth/register
+            success, resp = self.api_client._make_request(
+                "POST", "/auth/register", json={"email": email, "password": password}
+            )
+            if success:
+                snack = ft.SnackBar(
+                    ft.Text("Registration successful! Please log in."), open=True
+                )
+                page.overlay.append(snack)
+                page.update()
+                page.go("/login")
+            else:
+                error_msg = resp.get("error", "Registration failed.")
+                logger.warning(f"Register failed: {error_msg}")
+                snack = ft.SnackBar(ft.Text(f"Register failed: {error_msg}"), open=True)
+                page.overlay.append(snack)
+                page.update()
+                page.go("/login")
+
         def route_change(route):
-            """Handle route changes."""
+            """Handle route changes and authentication state."""
             logger.info(f"Route changed to: {route.route}")
+
+            # Check token presence (simple check)
+            if not self.jwt_token:
+                self.is_authenticated = False
+                self.api_client.clear_token()
 
             page.views.clear()
 
+            if not self.is_authenticated:
+                # Always show login page if not authenticated
+                page.views.append(login_page(handle_login, handle_register))
+                page.update()
+                return
+
+            # Authenticated: show requested page
             if page.route == "/users" or page.route == "/":
                 if self.user_page:
                     page.views.append(self.user_page.build())
-                    # Load users when page is displayed
                     self.user_page.load_users()
             else:
                 # Default route - redirect to users
@@ -92,6 +157,12 @@ class TattooStudioApp:
                     page.go(top_view.route)
                 else:
                     page.go("/users")
+            else:
+                # If no views left, force login
+                self.is_authenticated = False
+                self.jwt_token = None
+                self.api_client.clear_token()
+                page.go("/login")
 
         # Set up routing
         page.on_route_change = route_change

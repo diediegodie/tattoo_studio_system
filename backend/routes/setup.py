@@ -1,3 +1,5 @@
+from backend.routes.role_decorators import admin_required
+
 """
 Flask route for initial database setup (idempotent) and health check.
 
@@ -35,6 +37,7 @@ def health_check():
     )
 
 
+@admin_required
 @setup_bp.route("/api/setup/database", methods=["POST"])
 def setup_database():
     """
@@ -47,19 +50,50 @@ def setup_database():
             403, description="Database setup endpoint is only available in debug mode."
         )
 
-    # Get the application's database engine
+    # Ensure the application's database engine is initialized
     engine = global_db
     if engine is None:
-        return (
-            jsonify(
-                {
-                    "status": "FAILURE",
-                    "error": "Application database engine is not initialized",
-                    "timestamp": datetime.now().isoformat(),
-                }
-            ),
-            500,
-        )
+        from backend.database.models.base import init_engine
+
+        # Reason: Handle edge case where DB_URL is invalid or mock
+        if not isinstance(config.DB_URL, str) or not config.DB_URL:
+            return (
+                jsonify(
+                    {
+                        "status": "FAILURE",
+                        "error": "Database engine not initialized: Invalid or missing DB_URL for engine initialization",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
+                500,
+            )
+        try:
+            init_engine(config.DB_URL)
+            from backend.database.models.base import db as refreshed_db
+
+            engine = refreshed_db
+        except Exception as e:
+            return (
+                jsonify(
+                    {
+                        "status": "FAILURE",
+                        "error": f"Engine initialization error: {str(e)}",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
+                500,
+            )
+        if engine is None:
+            return (
+                jsonify(
+                    {
+                        "status": "FAILURE",
+                        "error": "Application database engine is not initialized",
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
+                500,
+            )
 
     # Get a session for potential commit operations
     session = get_session()

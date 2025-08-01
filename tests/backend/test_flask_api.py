@@ -138,7 +138,15 @@ class TestFlaskAPI:
                 try:
                     response = client.post(
                         "/api/users",
-                        data=json.dumps({"name": "John Doe", "birth": 1990}),
+                        data=json.dumps(
+                            {
+                                "name": "John Doe",
+                                "email": "john.doe@example.com",
+                                "password": "securepass123",
+                                "role": "staff",
+                                "birth": 1990,
+                            }
+                        ),
                         content_type="application/json",
                     )
 

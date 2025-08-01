@@ -1,3 +1,5 @@
+from backend.routes.role_decorators import admin_required
+
 """
 User API endpoints for Tattoo Studio Management System.
 
@@ -143,6 +145,7 @@ def delete_user_endpoint(user_id):
             return jsonify({"success": False, "error": "User not found"}), 404
         return jsonify({"success": True, "message": "User deleted successfully"}), 200
     except Exception as e:
+        # Reason: Propagate correct error codes from decorator
         logger.error(f"Error deleting user: {e}")
         return jsonify({"success": False, "error": str(e)}), 400
 

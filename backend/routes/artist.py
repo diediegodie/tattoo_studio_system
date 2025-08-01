@@ -1,3 +1,5 @@
+from backend.routes.role_decorators import admin_required
+
 """
 Artist API endpoints for Tattoo Studio Management System.
 Implements CRUD operations for Artist model.
@@ -132,6 +134,7 @@ def update_artist_endpoint(artist_id):
         return jsonify({"success": False, "error": str(e)}), 400
 
 
+@admin_required
 @artist_bp.route("/<int:artist_id>", methods=["DELETE"])
 def delete_artist_endpoint(artist_id):
     """Delete an artist by ID."""

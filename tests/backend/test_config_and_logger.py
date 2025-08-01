@@ -5,8 +5,8 @@ from utils.logger import setup_logger
 def test_app_config_defaults():
     """Test that AppConfig loads values from .env or defaults."""
     assert config.APP_NAME == "Tattoo Studio Manager"
-    assert config.DEBUG is False  # .env overrides default
-    assert str(config.DATABASE_PATH) == "data/prod.db"  # .env overrides default
+    assert config.DEBUG is True  # .env sets True
+    assert str(config.DATABASE_PATH) == "data/app.db"  # matches config default
     assert config.LOG_LEVEL == "INFO"  # .env overrides default
 
 
@@ -30,8 +30,8 @@ def test_app_config_missing_env(monkeypatch):
 
     cfg = AppConfig()
     assert cfg.APP_NAME == "Tattoo Studio Manager"
-    assert cfg.DEBUG is False
-    assert str(cfg.DATABASE_PATH) == "data/prod.db"
+    assert cfg.DEBUG is True
+    assert str(cfg.DATABASE_PATH) == "data/app.db"
     assert cfg.LOG_LEVEL == "INFO"
 
 

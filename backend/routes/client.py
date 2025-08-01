@@ -1,3 +1,5 @@
+from backend.routes.role_decorators import admin_required
+
 """
 Client API endpoints for Tattoo Studio Management System.
 
@@ -138,6 +140,7 @@ def update_client_endpoint(client_id):
         return jsonify({"success": False, "error": str(e)}), 400
 
 
+@admin_required
 @client_bp.route("/<int:client_id>", methods=["DELETE"])
 def delete_client_endpoint(client_id):
     """Delete a client by ID."""

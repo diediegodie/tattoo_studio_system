@@ -33,15 +33,16 @@ class AppConfig(BaseSettings):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # If TESTING is set (env or direct), use in-memory or temp DB
+        # Use DB_URL from env/.env if available, else fallback
+        db_url_env = os.environ.get("DB_URL") or self.DB_URL
         if self.TESTING or str(os.environ.get("TESTING", "0")).lower() in (
             "1",
             "true",
             "yes",
-        ):  # env override
-            self.DB_URL = os.environ.get("DB_URL", "sqlite:///:memory:")
+        ):
+            self.DB_URL = db_url_env or "sqlite:///:memory:"
         else:
-            self.DB_URL = f"sqlite:///{self.DATABASE_PATH}"
+            self.DB_URL = db_url_env or f"sqlite:///{self.DATABASE_PATH}"
         # Log DB path for confirmation
         print(f"[AppConfig] Using DB_URL: {self.DB_URL}")
 

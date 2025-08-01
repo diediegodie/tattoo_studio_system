@@ -45,7 +45,8 @@ class User(Base):
         self.active = active
 
     def __repr__(self):
-        return f"<User(id={self.id}, name='{self.name}', email='{self.email}', role='{self.role}')>"
+        birth_str = f", birth={self.birth}" if self.birth is not None else ""
+        return f"<User(id={self.id}, name='{self.name}', email='{self.email}', role='{self.role}'{birth_str})>"
 
     @staticmethod
     def hash_password(password):

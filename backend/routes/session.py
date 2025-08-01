@@ -1,3 +1,5 @@
+from backend.routes.role_decorators import admin_required
+
 """
 Session API endpoints for Tattoo Studio Management System.
 Implements CRUD operations for Session model.
@@ -12,6 +14,7 @@ from backend.database.models.session_model import (
     delete_session,
     list_all_sessions,
 )
+
 # Removed unused import: get_session
 from utils.logger import setup_logger
 from datetime import datetime
@@ -159,6 +162,7 @@ def update_session_endpoint(session_id):
         return jsonify({"success": False, "error": str(e)}), 400
 
 
+@admin_required
 @session_bp.route("/<int:session_id>", methods=["DELETE"])
 def delete_session_endpoint(session_id):
     """Delete a session by ID."""

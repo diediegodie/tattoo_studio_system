@@ -24,7 +24,7 @@ class TestUserModel:
 
     def test_create_user_normal_case(self, test_session):
         """Test creating a user with normal parameters."""
-        user = create_user("John Doe", birth=1990)
+        user = create_user("John Doe", "john@example.com", "password123", birth=1990)
         assert user is not None
         assert getattr(user, "name", None) == "John Doe"
         assert getattr(user, "birth", None) == 1990
@@ -33,7 +33,7 @@ class TestUserModel:
 
     def test_create_user_edge_case(self, test_session):
         """Test creating a user with minimal data."""
-        user = create_user("Jane Smith")
+        user = create_user("Jane Smith", "jane@example.com", "pw")
         assert user is not None
         assert getattr(user, "name", None) == "Jane Smith"
         assert getattr(user, "birth", None) is None
@@ -42,11 +42,13 @@ class TestUserModel:
     def test_create_user_failure_case(self, test_session):
         """Test creating a user with invalid data."""
         with pytest.raises(Exception):
-            create_user(None)  # Name is required
+            create_user(None, "fail@example.com", "pw")  # Name is required
 
     def test_read_user_normal_case(self, test_session):
         """Test reading an existing user."""
-        created_user = create_user("Alice Johnson", birth=1985)
+        created_user = create_user(
+            "Alice Johnson", "alice@example.com", "pw", birth=1985
+        )
         read_user_result = read_user(created_user.id)
         assert read_user_result is not None
         assert getattr(read_user_result, "name", None) == "Alice Johnson"
@@ -59,7 +61,7 @@ class TestUserModel:
 
     def test_read_user_by_name_normal_case(self, test_session):
         """Test reading user by name."""
-        create_user("Bob Wilson", birth=1988)
+        create_user("Bob Wilson", "bob@example.com", "pw", birth=1988)
         result = read_user_by_name("Bob Wilson")
         assert result is not None
         assert getattr(result, "name", None) == "Bob Wilson"
@@ -67,7 +69,7 @@ class TestUserModel:
 
     def test_update_user_normal_case(self, test_session):
         """Test updating user information."""
-        user = create_user("Update Me", birth=1995)
+        user = create_user("Update Me", "update@example.com", "pw", birth=1995)
         updated = update_user(user.id, name="Updated Name", birth=2000)
         assert updated is not None
         assert getattr(updated, "name", None) == "Updated Name"
@@ -75,7 +77,7 @@ class TestUserModel:
 
     def test_update_user_edge_case(self, test_session):
         """Test updating user with no changes."""
-        user = create_user("No Change", birth=1992)
+        user = create_user("No Change", "nochange@example.com", "pw", birth=1992)
         updated = update_user(user.id)
         assert updated is not None
         assert getattr(updated, "name", None) == "No Change"
@@ -87,28 +89,28 @@ class TestUserModel:
 
     def test_delete_user_normal_case(self, test_session):
         """Test deleting a user."""
-        user = create_user("Delete Me", birth=1980)
+        user = create_user("Delete Me", "deleteme@example.com", "pw", birth=1980)
         deleted = delete_user(user.id)
         assert deleted is True
 
     def test_delete_user_edge_case(self, test_session):
         """Test deleting already deleted user."""
-        user = create_user("Delete Twice", birth=1981)
+        user = create_user("Delete Twice", "deletetwice@example.com", "pw", birth=1981)
         delete_user(user.id)
         deleted_again = delete_user(user.id)
         assert deleted_again is False
 
     def test_list_all_users_normal_case(self, test_session):
         """Test listing all users."""
-        create_user("User1")
-        create_user("User2")
+        create_user("User1", "user1@example.com", "pw")
+        create_user("User2", "user2@example.com", "pw")
         users = list_all_users()
         assert isinstance(users, list)
         assert len(users) >= 2
 
     def test_user_model_repr(self, test_session):
         """Test the User model string representation."""
-        user = create_user("Test User", birth=1995)
+        user = create_user("Test User", "testuser@example.com", "pw", birth=1995)
         repr_str = repr(user)
         assert "Test User" in repr_str
         assert "1995" in repr_str
@@ -117,8 +119,10 @@ class TestUserModel:
     def test_create_duplicate_names_allowed(self, test_session):
         """Test that users with duplicate names can be created (only ID is unique)."""
         # Reason: Verify that duplicate names are allowed in the system
-        user1 = create_user("John Smith", birth=1990)
-        user2 = create_user("John Smith", birth=1985)  # Same name, different birth year
+        user1 = create_user("John Smith", "john1@example.com", "pw", birth=1990)
+        user2 = create_user(
+            "John Smith", "john2@example.com", "pw", birth=1985
+        )  # Same name, different birth year
 
         assert user1 is not None
         assert user2 is not None
@@ -151,9 +155,11 @@ class TestUserModel:
         initial_all_count = len(initial_all_users)
 
         # Create multiple users with different active status
-        create_user("Active User 1", birth=1990)
-        create_user("Active User 2", birth=1991)
-        create_user("Active User 3", birth=1992, active=False)
+        create_user("Active User 1", "active1@example.com", "pw", birth=1990)
+        create_user("Active User 2", "active2@example.com", "pw", birth=1991)
+        create_user(
+            "Active User 3", "active3@example.com", "pw", birth=1992, active=False
+        )
 
         # List only active users
         active_users = list_all_users(active_only=True)

@@ -5,11 +5,7 @@ Follows project modularity and error handling conventions.
 """
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import (
-    create_access_token,
-    jwt_required,
-    get_jwt_identity,
-)
+from backend.utils.jwt_utils import create_access_token, JWTValidationError
 from backend.database.models.user_model import (
     create_user,
     read_user_by_email,
@@ -21,7 +17,7 @@ auth_bp = Blueprint("auth_bp", __name__, url_prefix="/auth")
 logger = setup_logger(__name__)
 
 
-@auth_bp.route("/register", methods=["POST"])
+@auth_bp.route("register", methods=["POST"])
 def register():
     """Register a new user (admin or staff)."""
     data = request.get_json()
@@ -63,7 +59,7 @@ def register():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@auth_bp.route("/login", methods=["POST"])
+@auth_bp.route("login", methods=["POST"])
 def login():
     """Authenticate user and return JWT token."""
     data = request.get_json()
@@ -74,7 +70,12 @@ def login():
     user = read_user_by_email(email)
     if not user or not user.check_password(password):
         return jsonify({"success": False, "error": "Invalid credentials"}), 401
-    access_token = create_access_token(identity={"id": user.id, "role": user.role})
+    try:
+        payload = {"id": user.id, "role": user.role}
+        access_token = create_access_token(payload)
+    except JWTValidationError as e:
+        logger.error(f"JWT generation error: {e}")
+        return jsonify({"success": False, "error": "Token generation failed"}), 500
     return (
         jsonify(
             {
