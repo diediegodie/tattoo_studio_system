@@ -6,6 +6,7 @@ Follows project modularity and error handling conventions.
 """
 
 from flask import Blueprint, request, jsonify
+from backend.routes.role_decorators import admin_required
 from backend.database.models.user_model import (
     create_user,
     read_user,
@@ -53,6 +54,8 @@ def create_user_endpoint():
 
         user = create_user(
             name=data.get("name"),
+            email=data.get("email"),
+            password=data.get("password"),
             birth=data.get("birth"),
             active=data.get("active", True),
         )
@@ -131,6 +134,7 @@ def update_user_endpoint(user_id):
 
 
 @user_bp.route("/<int:user_id>", methods=["DELETE"])
+@admin_required
 def delete_user_endpoint(user_id):
     """Delete a user by ID."""
     try:

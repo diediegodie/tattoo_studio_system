@@ -43,12 +43,21 @@ def create_app(config_overrides: Optional[dict] = None):
         )
         init_session()
 
+    # JWT Setup
+    from flask_jwt_extended import JWTManager
+    from backend.routes.auth import auth_bp
+
+    app.config["JWT_SECRET_KEY"] = app.config.get("JWT_SECRET_KEY", "super-secret-key")
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 3600  # 1 hour
+    jwt = JWTManager(app)
+
     # Register Blueprints
     app.register_blueprint(client_bp)
     app.register_blueprint(artist_bp)
     app.register_blueprint(session_bp)
     app.register_blueprint(user_bp)
     app.register_blueprint(setup_bp)
+    app.register_blueprint(auth_bp)
 
     # Register error handlers
     @app.errorhandler(404)

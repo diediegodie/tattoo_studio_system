@@ -3,10 +3,13 @@ User model and CRUD operations.
 """
 
 from sqlalchemy import Column, String, Integer, Boolean
+from flask_bcrypt import Bcrypt
 from .base import Base, get_session
 from utils.logger import setup_logger
 
+
 logger = setup_logger(__name__)
+bcrypt = Bcrypt()
 
 
 class User(Base):
@@ -16,33 +19,56 @@ class User(Base):
 
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     name = Column("name", String(100), nullable=False)
+    email = Column("email", String(120), unique=True, nullable=False)
+    password = Column("password", String(128), nullable=False)
+    role = Column("role", String(20), nullable=False, default="staff")  # admin or staff
     birth = Column("birth", Integer, nullable=True)  # Birth year as integer
     active = Column("active", Boolean, default=True)
 
-    def __init__(self, name, birth=None, active=True):
+    def __init__(self, name, email, password, role="staff", birth=None, active=True):
         """
         Initialize a new User.
 
         Args:
             name (str): User's full name
+            email (str): User's email (unique)
+            password (str): Plaintext password (will be hashed)
+            role (str): User role (admin or staff)
             birth (int): Birth year (optional)
             active (bool): Whether the user is active (default: True)
         """
         self.name = name
+        self.email = email
+        self.password = self.hash_password(password)
+        self.role = role
         self.birth = birth
         self.active = active
 
     def __repr__(self):
-        return f"<User(id={self.id}, name='{self.name}', birth={self.birth})>"
+        return f"<User(id={self.id}, name='{self.name}', email='{self.email}', role='{self.role}')>"
+
+    @staticmethod
+    def hash_password(password):
+        """Hash a plaintext password using bcrypt."""
+        return bcrypt.generate_password_hash(password).decode("utf-8")
+
+    def check_password(self, password):
+        """Check a plaintext password against the stored hash."""
+        return bcrypt.check_password_hash(self.password, password)
 
 
 # CRUD operations for User
-def create_user(name, birth=None, active=True):
+
+
+def create_user(name, email, password, role="staff", birth=None, active=True):
     """
-    Create a new user.
+    Create a new user with hashed password.
 
     Args:
         name (str): User's full name
+        email (str): User's email (unique)
+        password (str): Plaintext password
+        role (str): User role (admin or staff)
         birth (int): Birth year (optional)
         active (bool): Whether the user is active
 
@@ -51,10 +77,17 @@ def create_user(name, birth=None, active=True):
     """
     session = get_session()
     try:
-        user = User(name=name, birth=birth, active=active)
+        user = User(
+            name=name,
+            email=email,
+            password=password,
+            role=role,
+            birth=birth,
+            active=active,
+        )
         session.add(user)
         session.commit()
-        logger.info(f"User created successfully: {user.name}")
+        logger.info(f"User created successfully: {user.name} ({user.email})")
         return user
     except Exception as e:
         session.rollback()
@@ -82,6 +115,29 @@ def read_user(user_id):
         return user
     except Exception as e:
         logger.error(f"Error reading user: {e}")
+        raise
+
+
+def read_user_by_email(email):
+    """
+    Read a user by email.
+
+    Args:
+        email (str): The user's email
+
+    Returns:
+        User: The user object or None if not found
+    """
+    session = get_session()
+    try:
+        user = session.query(User).filter_by(email=email).first()
+        if user:
+            logger.info(f"User found by email: {user.email}")
+        else:
+            logger.warning(f"User with email '{email}' not found")
+        return user
+    except Exception as e:
+        logger.error(f"Error reading user by email: {e}")
         raise
 
 
