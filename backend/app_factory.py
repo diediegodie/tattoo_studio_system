@@ -1,11 +1,9 @@
-from configs.config import config
-from typing import Optional
-
 """
 Application Factory for the Flask App.
 """
 
 import logging
+from typing import Optional
 from flask import Flask
 from backend.routes.client import client_bp
 from backend.routes.artist import artist_bp
@@ -21,7 +19,11 @@ def create_app(config_overrides: Optional[dict] = None):
     """
     app = Flask(__name__)
 
-    # Load default config and override if necessary
+    # Load config at runtime to ensure environment variables are fresh
+    from configs.config import AppConfig
+
+    config = AppConfig()
+
     app.config.from_object(config)
     if config_overrides:
         app.config.update(config_overrides)
@@ -35,13 +37,43 @@ def create_app(config_overrides: Optional[dict] = None):
     import os
     from backend.database.models.base import db
 
-    if not (os.environ.get("TESTING") == "1" and db is not None):
+    # For live server tests (frontend/integration), we need to initialize the database
+    # even when TESTING=1 if using a file-based database
+    is_memory_db = ":memory:" in db_url
+    skip_db_init = os.environ.get("TESTING") == "1" and db is not None and is_memory_db
+
+    if not skip_db_init:
         # Initialize database engine and session
-        init_engine(
-            db_url,
-            connect_args={"check_same_thread": False} if "sqlite" in db_url else {},
-        )
+        init_engine(db_url)
         init_session()
+
+        # Create tables if they don't exist (important for live server tests)
+        from services.database_initializer import initialize_database
+        from backend.database.models.base import db, get_session
+
+        if db is not None:
+            try:
+                # Reason: For file-based SQLite, ensure database file is writable
+                if "sqlite" in db_url and not ":memory:" in db_url:
+                    import os
+
+                    db_file = db_url.replace("sqlite:///", "")
+                    if db_file and os.path.exists(db_file):
+                        # Ensure the database file is writable
+                        import stat
+
+                        current_permissions = os.stat(db_file).st_mode
+                        os.chmod(
+                            db_file, current_permissions | stat.S_IWUSR | stat.S_IWGRP
+                        )
+                        logging.info(f"Ensured database file is writable: {db_file}")
+
+                initialize_database(engine=db, session=get_session())
+                logging.info("Database tables initialized successfully")
+            except Exception as e:
+                logging.warning(
+                    f"Database initialization failed (tables may already exist): {e}"
+                )
 
     # JWT Setup
     from flask_jwt_extended import JWTManager

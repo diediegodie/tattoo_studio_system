@@ -97,7 +97,12 @@ class TestFrontendBackendIntegration:
         """Test complete CRUD operations through API client."""
         # Test 1: Create a new user
         success, response = self.api_client.create_user(
-            name="Integration Test User", birth=1990, active=True
+            name="Integration Test User",
+            birth=1990,
+            active=True,
+            password="integrationpass123",
+            email="integration_test_user@example.com",
+            role="admin",
         )
 
         assert success, f"User creation failed: {response}"
@@ -150,7 +155,13 @@ class TestFrontendBackendIntegration:
 
         logger.info("Get all users test passed")
 
-        # Test 6: Delete the user
+        # Test 6: Delete the user (requires authentication)
+        # Log in as the created user to get JWT token
+        login_success, login_resp = self.api_client.login(
+            email="integration_test_user@example.com", password="integrationpass123"
+        )
+        assert login_success, f"Login for deletion failed: {login_resp}"
+        # Token is set by APIClient.login automatically
         success, response = self.api_client.delete_user(user_id)
 
         assert success, f"User deletion failed: {response}"
@@ -176,7 +187,7 @@ class TestFrontendBackendIntegration:
         logger.info("Non-existent user error handling test passed")
 
         # Test 2: Create user with invalid data
-        success, response = self.api_client.create_user(name="")
+        success, response = self.api_client.create_user(name="", password="")
 
         assert not success
         assert "error" in response

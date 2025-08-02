@@ -1,9 +1,15 @@
+import os
+
+# Ensure test_integration.db is deleted before integration tests
+TEST_DB_PATH = os.path.join(os.path.dirname(__file__), "../test_integration.db")
+if os.path.exists(TEST_DB_PATH):
+    os.remove(TEST_DB_PATH)
+
 """
 Pytest configuration for test isolation.
 Creates a global in-memory SQLite database for all tests with proper isolation.
 """
 
-import os
 import sys
 from pathlib import Path
 import pytest
@@ -23,23 +29,25 @@ def test_engine():
     """
     Session-scoped test database engine.
 
-    Creates a single in-memory SQLite database engine for all tests in the session.
+    Creates a single database engine for all tests in the session.
+    It uses an in-memory SQLite database by default, but can be overridden
+    by setting the DB_URL environment variable (e.g., for integration tests).
     """
     # Set test environment variables
     os.environ["TESTING"] = "1"
-    os.environ["DB_URL"] = "sqlite:///:memory:"
 
-    # Create test config instance
+    # Create test config instance to get the DB_URL
     test_config = AppConfig()
+    db_url = test_config.DB_URL
 
     # Create engine with test-friendly settings
     engine = create_engine(
-        "sqlite:///:memory:",
+        db_url,
         connect_args={"check_same_thread": False},
         echo=False,  # Set to True for SQL debugging
     )
 
-    print(f"[conftest] Test engine created with DB_URL: {test_config.DB_URL}")
+    print(f"[conftest] Test engine created with DB_URL: {db_url}")
 
     yield engine
 
@@ -142,8 +150,24 @@ def pytest_configure(config):
     """
     # Ensure test environment is set early
     os.environ["TESTING"] = "1"
+
+    # For frontend tests, preserve any existing DB_URL (file-based) from the test script
+    # For other tests, use in-memory DB for speed and isolation
     if "DB_URL" not in os.environ:
-        os.environ["DB_URL"] = "sqlite:///:memory:"
+        # Check if we're running frontend or integration tests
+        import sys
+
+        test_args = " ".join(sys.argv)
+        if "tests/frontend" in test_args or "tests/integration" in test_args:
+            # Use file-based database for frontend/integration tests
+            # Use an absolute path to avoid ambiguity
+            db_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "../test_integration.db")
+            )
+            os.environ["DB_URL"] = f"sqlite:///{db_path}"
+        else:
+            # Use in-memory database for backend tests
+            os.environ["DB_URL"] = "sqlite:///:memory:"
 
     print(f"[pytest_configure] TESTING=1, DB_URL={os.environ['DB_URL']}")
 

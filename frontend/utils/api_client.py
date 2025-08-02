@@ -214,7 +214,13 @@ class APIClient:
         return self._make_request("GET", f"/api/users/{user_id}")
 
     def create_user(
-        self, name: str, birth: Optional[int] = None, active: bool = True
+        self,
+        name: str,
+        birth: Optional[int] = None,
+        active: bool = True,
+        password: Optional[str] = None,
+        email: Optional[str] = None,
+        role: str = "staff",
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Create a new user.
@@ -223,14 +229,20 @@ class APIClient:
             name (str): User's name (required)
             birth (Optional[int]): Birth year
             active (bool): Whether user is active
+            password (Optional[str]): User password
+            email (Optional[str]): User email
 
         Returns:
             Tuple[bool, Dict]: (success, response_data)
             Response format: {"success": bool, "user": Dict, "message": str}
         """
-        data = {"name": name, "active": active}
+        data = {"name": name, "active": active, "role": role}
         if birth is not None:
             data["birth"] = birth
+        if password is not None:
+            data["password"] = password
+        if email is not None:
+            data["email"] = email
 
         return self._make_request("POST", "/api/users", json=data)
 

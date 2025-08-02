@@ -26,7 +26,7 @@ class AppConfig(BaseSettings):
     JWT_SECRET_KEY: str = ""  # Should be set via environment variable or .env
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.environ.get("ENV_FILE", ".env"),
         case_sensitive=True,
         extra="ignore",  # Ignore extra environment variables
     )

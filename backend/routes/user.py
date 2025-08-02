@@ -58,6 +58,7 @@ def create_user_endpoint():
             name=data.get("name"),
             email=data.get("email"),
             password=data.get("password"),
+            role=data.get("role", "staff"),
             birth=data.get("birth"),
             active=data.get("active", True),
         )
@@ -68,6 +69,8 @@ def create_user_endpoint():
                     "user": {
                         "id": user.id,
                         "name": user.name,
+                        "email": user.email,
+                        "role": user.role,
                         "birth": user.birth,
                         "active": user.active,
                     },

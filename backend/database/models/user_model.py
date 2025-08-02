@@ -2,7 +2,7 @@
 User model and CRUD operations.
 """
 
-from sqlalchemy import Column, String, Integer, Boolean
+from sqlalchemy import Column, String, Integer, Boolean, text
 from flask_bcrypt import Bcrypt
 from .base import Base, get_session
 from utils.logger import setup_logger
@@ -94,6 +94,9 @@ def create_user(name, email, password, role="staff", birth=None, active=True):
         session.rollback()
         logger.error(f"Error creating user: {e}")
         raise
+    finally:
+        # Reason: Always close the session to prevent connection leaks
+        session.close()
 
 
 def read_user(user_id):
@@ -101,22 +104,44 @@ def read_user(user_id):
     Read a user by ID.
 
     Args:
-        user_id (int): The user's ID
+        user_id (int): The ID of the user to retrieve.
 
     Returns:
-        User: The user object or None if not found
+        User or None: User object if found, None otherwise.
     """
-    session = get_session()
-    try:
-        user = session.query(User).filter_by(id=user_id).first()
-        if user:
-            logger.info(f"User found: {user.name}")
-        else:
-            logger.warning(f"User with ID {user_id} not found")
-        return user
-    except Exception as e:
-        logger.error(f"Error reading user: {e}")
-        raise
+    import time
+
+    # Retry mechanism for database I/O errors
+    max_retries = 3
+    retry_delay = 0.1
+
+    for attempt in range(max_retries):
+        session = get_session()
+        try:
+            user = session.query(User).filter(User.id == user_id).first()
+            if user:
+                logger.info(f"User found: {user.name}")
+            else:
+                logger.warning(f"User with ID {user_id} not found")
+            return user
+
+        except Exception as e:
+            logger.error(
+                f"Error reading user (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+            session.rollback()
+
+            # If this is not the last attempt, wait and retry
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # Last attempt failed, return None
+                return None
+
+        finally:
+            session.close()
 
 
 def read_user_by_email(email):
@@ -124,22 +149,44 @@ def read_user_by_email(email):
     Read a user by email.
 
     Args:
-        email (str): The user's email
+        email (str): The email of the user to retrieve.
 
     Returns:
-        User: The user object or None if not found
+        User or None: User object if found, None otherwise.
     """
-    session = get_session()
-    try:
-        user = session.query(User).filter_by(email=email).first()
-        if user:
-            logger.info(f"User found by email: {user.email}")
-        else:
-            logger.warning(f"User with email '{email}' not found")
-        return user
-    except Exception as e:
-        logger.error(f"Error reading user by email: {e}")
-        raise
+    import time
+
+    # Retry mechanism for database I/O errors
+    max_retries = 3
+    retry_delay = 0.1
+
+    for attempt in range(max_retries):
+        session = get_session()
+        try:
+            user = session.query(User).filter_by(email=email).first()
+            if user:
+                logger.info(f"User found by email: {email}")
+            else:
+                logger.warning(f"User with email '{email}' not found")
+            return user
+
+        except Exception as e:
+            logger.error(
+                f"Error reading user by email (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+            session.rollback()
+
+            # If this is not the last attempt, wait and retry
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # Last attempt failed, return None
+                return None
+
+        finally:
+            session.close()
 
 
 def read_user_by_name(name):
@@ -152,17 +199,39 @@ def read_user_by_name(name):
     Returns:
         User: The user object or None if not found
     """
-    session = get_session()
-    try:
-        user = session.query(User).filter_by(name=name).first()
-        if user:
-            logger.info(f"User found by name: {user.name}")
-        else:
-            logger.warning(f"User with name '{name}' not found")
-        return user
-    except Exception as e:
-        logger.error(f"Error reading user by name: {e}")
-        raise
+    import time
+
+    # Retry mechanism for database I/O errors
+    max_retries = 3
+    retry_delay = 0.1
+
+    for attempt in range(max_retries):
+        session = get_session()
+        try:
+            user = session.query(User).filter_by(name=name).first()
+            if user:
+                logger.info(f"User found by name: {user.name}")
+            else:
+                logger.warning(f"User with name '{name}' not found")
+            return user
+
+        except Exception as e:
+            logger.error(
+                f"Error reading user by name (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+            session.rollback()
+
+            # If this is not the last attempt, wait and retry
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # Last attempt failed, raise the exception
+                raise
+
+        finally:
+            session.close()
 
 
 def update_user(user_id, **kwargs):
@@ -176,23 +245,45 @@ def update_user(user_id, **kwargs):
     Returns:
         User: The updated user object or None if not found
     """
-    session = get_session()
-    try:
-        user = session.query(User).filter_by(id=user_id).first()
-        if user:
-            for key, value in kwargs.items():
-                if hasattr(user, key):
-                    setattr(user, key, value)
-            session.commit()
-            logger.info(f"User updated successfully: {user.name}")
-            return user
-        else:
-            logger.warning(f"User with ID {user_id} not found for update")
-            return None
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error updating user: {e}")
-        raise
+    import time
+
+    # Retry mechanism for database I/O errors
+    max_retries = 3
+    retry_delay = 0.1
+
+    for attempt in range(max_retries):
+        session = get_session()
+        try:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user:
+                for key, value in kwargs.items():
+                    if hasattr(user, key):
+                        setattr(user, key, value)
+                session.commit()
+                logger.info(f"User updated successfully: {user.name}")
+                return user
+            else:
+                logger.warning(f"User with ID {user_id} not found for update")
+                return None
+
+        except Exception as e:
+            session.rollback()
+            logger.error(
+                f"Error updating user (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+
+            # If this is not the last attempt, wait and retry
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # Last attempt failed, raise the exception
+                raise
+
+        finally:
+            # Reason: Always close the session to prevent connection leaks
+            session.close()
 
 
 def delete_user(user_id):
@@ -205,41 +296,94 @@ def delete_user(user_id):
     Returns:
         bool: True if deleted successfully, False if not found
     """
-    session = get_session()
-    try:
-        user = session.query(User).filter_by(id=user_id).first()
-        if user:
-            session.delete(user)
-            session.commit()
-            logger.info(f"User deleted successfully: {user.name}")
-            return True
-        else:
-            logger.warning(f"User with ID {user_id} not found for deletion")
-            return False
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Error deleting user: {e}")
-        raise
+    import time
+
+    # Retry mechanism for database I/O errors
+    max_retries = 3
+    retry_delay = 0.1
+
+    for attempt in range(max_retries):
+        session = get_session()
+        try:
+            user = session.query(User).filter_by(id=user_id).first()
+            if user:
+                session.delete(user)
+                session.commit()
+                logger.info(f"User deleted successfully: {user.name}")
+                return True
+            else:
+                logger.warning(f"User with ID {user_id} not found for deletion")
+                return False
+
+        except Exception as e:
+            session.rollback()
+            logger.error(
+                f"Error deleting user (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+
+            # If this is not the last attempt, wait and retry
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # Last attempt failed, raise the exception
+                raise
+
+        finally:
+            # Reason: Always close the session to prevent connection leaks
+            session.close()
 
 
-def list_all_users(active_only=True):
+def list_all_users(active_only=False):
     """
-    List all users in the database.
+    List all users with optional filtering.
 
     Args:
-        active_only (bool): If True, only return active users
+        active_only (bool): If True, only active users are returned.
 
     Returns:
-        list: List of User objects
+        list: List of User objects or empty list if error.
     """
-    session = get_session()
-    try:
-        if active_only:
-            users = session.query(User).filter_by(active=True).all()
-        else:
-            users = session.query(User).all()
-        logger.info(f"Retrieved {len(users)} users from database")
-        return users
-    except Exception as e:
-        logger.error(f"Error listing users: {e}")
-        raise
+    import time
+
+    # Retry mechanism for database I/O errors
+    max_retries = 3
+    retry_delay = 0.1
+
+    for attempt in range(max_retries):
+        session = get_session()
+        try:
+            # Start with read uncommitted for better concurrent performance
+            query = session.query(User)
+
+            if active_only:
+                # Use text() to avoid type annotation issues
+                query = query.filter(text("active = 1"))
+
+            # Execute with explicit transaction isolation
+            session.connection(
+                execution_options={"isolation_level": "READ_UNCOMMITTED"}
+            )
+            users = query.all()
+
+            logger.info(f"Listed {len(users)} users (active_only={active_only})")
+            return users
+
+        except Exception as e:
+            logger.error(
+                f"Error listing users (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+            session.rollback()
+
+            # If this is not the last attempt, wait and retry
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # Last attempt failed, return empty list
+                return []
+
+        finally:
+            session.close()

@@ -46,8 +46,33 @@ class TattooStudioApp:
         self.user_page: Optional[UserManagementPage] = None
         logger.info("Tattoo Studio App initialized")
 
-        # JWT token (in-memory only)
+        # JWT token (in-memory)
         self.jwt_token = None
+        self.is_authenticated = False
+
+    def store_token(self, page, token: str):
+        """Store JWT token in memory and client storage."""
+        self.jwt_token = token
+        self.api_client.set_token(token)
+        page.client_storage.set("jwt_token", token)
+
+    def load_token(self, page):
+        """Load JWT token from client storage if available."""
+        token = page.client_storage.get("jwt_token")
+        if token:
+            self.jwt_token = token
+            self.api_client.set_token(token)
+            self.is_authenticated = True
+        else:
+            self.jwt_token = None
+            self.api_client.clear_token()
+            self.is_authenticated = False
+
+    def clear_token(self, page):
+        """Clear JWT token from memory and client storage."""
+        self.jwt_token = None
+        self.api_client.clear_token()
+        page.client_storage.remove("jwt_token")
         self.is_authenticated = False
 
     def main(self, page: ft.Page):
@@ -72,21 +97,17 @@ class TattooStudioApp:
             Handle login: call API, store JWT, set auth state, redirect.
             """
             logger.info(f"Login attempt: {email}")
-            # Call backend /auth/login
-            success, resp = self.api_client._make_request(
-                "POST", "/auth/login", json={"email": email, "password": password}
-            )
+            success, resp = self.api_client.login(email=email, password=password)
             if success and "access_token" in resp:
                 token = resp["access_token"]
-                self.jwt_token = token
-                self.api_client.set_token(token)
-                self.is_authenticated = True
+                self.store_token(page, token)
                 logger.info("Login successful, JWT stored.")
                 snack = ft.SnackBar(ft.Text("Login successful!"), open=True)
                 page.overlay.append(snack)
                 page.update()
                 page.go("/users")
             else:
+                self.clear_token(page)
                 error_msg = resp.get("error", "Login failed. Check credentials.")
                 logger.warning(f"Login failed: {error_msg}")
                 snack = ft.SnackBar(ft.Text(f"Login failed: {error_msg}"), open=True)
@@ -120,6 +141,20 @@ class TattooStudioApp:
 
         def route_change(route):
             """Handle route changes and authentication state."""
+            # Load token from client storage on every route change
+            self.load_token(page)
+            # If not authenticated, redirect to login
+            if not self.jwt_token:
+                logger.info("No JWT token found, redirecting to login.")
+                page.go("/login")
+                return
+            # If token is present but API returns 401, clear and redirect
+            # This is handled in APIClient._make_request, but double check here
+            if not self.is_authenticated:
+                logger.info("JWT token invalid/expired, redirecting to login.")
+                page.go("/login")
+                return
+            # ...existing code...
             logger.info(f"Route changed to: {route.route}")
 
             # Check token presence (simple check)

@@ -67,3 +67,7 @@ coverage.*
 *.orig
 *.tmp
 *.temp
+
+# == DB ==
+test_integration.db-wal
+test_integration.db-shm
