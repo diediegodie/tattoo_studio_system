@@ -13,6 +13,7 @@ GET /health
 
 from flask import Blueprint, jsonify, current_app, abort
 from services.database_initializer import initialize_database
+from automations.backup_flow import daily_backup_flow, BACKUP_DIR
 from configs.config import AppConfig
 from datetime import datetime
 from backend.database.models.base import db as global_db, get_session
@@ -105,3 +106,25 @@ def setup_database():
         # Always close the session
         if session:
             session.close()
+
+@admin_required
+@setup_bp.route("/api/backup/database", methods=["POST"])
+def backup_database():
+    """
+    Endpoint to trigger database backup and rotation.
+    Only available to admin users.
+    """
+    import os
+    try:
+        daily_backup_flow()
+        # Find today's backup file
+        from datetime import datetime
+        today = datetime.now().strftime("%Y%m%d")
+        backup_file = f"{today}.db"
+        backup_path = os.path.join(BACKUP_DIR, backup_file)
+        if os.path.exists(backup_path):
+            return jsonify({"status": "SUCCESS", "backup_file": backup_file}), 200
+        else:
+            return jsonify({"status": "FAILURE", "error": "Backup file not created"}), 500
+    except Exception as e:
+        return jsonify({"status": "FAILURE", "error": str(e)}), 500

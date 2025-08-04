@@ -29,7 +29,8 @@ def test_register_and_login_normal_case(api_client):
     success, resp = api_client.login(email=email, password=password)
     assert success, f"Login failed: {resp}"
     assert "access_token" in resp
-    assert api_client._jwt_token is not None
+    # Reason: Refactored attribute name in APIClient
+    assert api_client.jwt_token is not None
 
 
 def test_login_invalid_credentials(api_client):
@@ -45,4 +46,6 @@ def test_register_missing_fields(api_client):
     success, resp = api_client.register(email="", password="", name="", role="staff")
     assert not success
     assert "error" in resp
-    assert resp.get("status_code") == 400
+    # Reason: API response does not include status_code, check error and success fields
+    assert resp.get("success") is False
+    assert "Missing required fields" in resp.get("error", "")

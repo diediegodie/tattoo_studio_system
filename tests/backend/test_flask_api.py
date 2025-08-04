@@ -1,3 +1,65 @@
+import os
+import shutil
+from datetime import datetime, timedelta
+import pytest
+from automations.backup_flow import (
+    backup_db,
+    rotate_backups,
+    BACKUP_DIR,
+    DB_PATH,
+    RETENTION_DAYS,
+)
+
+
+# Backup test setup/teardown fixture
+@pytest.fixture(autouse=True)
+def backup_test_setup_and_teardown():
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    with open(DB_PATH, "wb") as f:
+        f.write(b"123")
+    yield
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+    for fname in os.listdir(BACKUP_DIR):
+        os.remove(os.path.join(BACKUP_DIR, fname))
+
+
+class TestBackupFlow:
+    """Test cases for backup and rotation logic, and backup API endpoint."""
+
+    def test_backup_db_normal(self):
+        backup_file = backup_db()
+        assert os.path.exists(backup_file)
+        assert backup_file.endswith(".db")
+
+    def test_backup_db_missing(self):
+        os.remove(DB_PATH)
+        with pytest.raises(FileNotFoundError):
+            backup_db()
+
+    def test_rotate_backups(self):
+        # Create backup older than retention window
+        old_date = (datetime.now() - timedelta(days=RETENTION_DAYS + 1)).strftime(
+            "%Y%m%d"
+        )
+        old_file = os.path.join(BACKUP_DIR, f"{old_date}.db")
+        with open(old_file, "wb") as f:
+            f.write(b"old")
+        rotate_backups()
+        assert not os.path.exists(old_file)
+
+    def test_backup_api_endpoint(self, client):
+        # Test the /api/backup/database endpoint
+        response = client.post("/api/backup/database")
+        data = json.loads(response.data)
+        assert response.status_code == 200
+        assert data["status"] == "SUCCESS"
+        today = datetime.now().strftime("%Y%m%d")
+        backup_file = f"{today}.db"
+        backup_path = os.path.join(BACKUP_DIR, backup_file)
+        assert os.path.exists(backup_path)
+
+
 """
 Test file for Flask backend API.
 
@@ -5,8 +67,6 @@ Tests the integration between Flask endpoints and database operations.
 Following the project guidelines for comprehensive testing.
 """
 
-import pytest
-import json
 import pytest
 import json
 from unittest.mock import patch

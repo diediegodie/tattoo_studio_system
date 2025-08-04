@@ -11,6 +11,7 @@ Key Features:
 - Timeout configuration
 - Connection validation
 - User-friendly error messages for UI display
+- Modular design with feature-specific API modules
 """
 
 import requests
@@ -26,6 +27,10 @@ sys.path.insert(0, project_root)
 
 from utils.logger import setup_logger
 from configs.config import AppConfig
+from frontend.utils.users_api import UserAPI
+from frontend.utils.clients_api import ClientAPI
+from frontend.utils.artists_api import ArtistAPI
+from frontend.utils.sessions_api import SessionAPI
 
 # Initialize logger and config
 logger = setup_logger(__name__)
@@ -33,185 +38,170 @@ config = AppConfig()
 
 
 class APIClient:
+    def search_user_by_name(self, name: str) -> Tuple[bool, Dict[str, Any]]:
+        """Search for a user by name using the users API."""
+        return self.user_api.search_user_by_name(self._make_request, name)
+
+    """
+    Main API client for communication with the Flask backend.
+
+    This class serves as the central point for all API interactions,
+    delegating specific operations to specialized API modules while
+    providing common functionality like request handling, authentication,
+    and error management.
+    """
+
+    def __init__(self, base_url: Optional[str] = None):
+        """Initialize the API client with configuration and API modules."""
+        self.base_url = base_url or getattr(
+            config, "API_BASE_URL", "http://localhost:5000"
+        )
+        self.timeout = getattr(config, "API_TIMEOUT", 30)
+        self.jwt_token = None
+
+        # Initialize feature-specific API modules
+        self.user_api = UserAPI()
+        self.client_api = ClientAPI()
+        self.artist_api = ArtistAPI()
+        self.session_api = SessionAPI()
+
+        logger.info(f"APIClient initialized with base URL: {self.base_url}")
+
+    def set_token(self, token: str):
+        """Set JWT token for authenticated requests."""
+        self.jwt_token = token
+        logger.info("JWT token set for authenticated requests")
+
+    def clear_token(self):
+        """Clear JWT token."""
+        self.jwt_token = None
+        logger.info("JWT token cleared")
+
+    def _get_headers(self) -> Dict[str, str]:
+        """Get headers for API requests including authorization if available."""
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        if self.jwt_token:
+            headers["Authorization"] = f"Bearer {self.jwt_token}"
+
+        return headers
+
+    def _make_request(
+        self,
+        method: str,
+        endpoint: str,
+        json: Optional[Dict] = None,
+        params: Optional[Dict] = None,
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Make HTTP request to the API.
+
+        Args:
+            method (str): HTTP method (GET, POST, PUT, DELETE)
+            endpoint (str): API endpoint path
+            json (Dict, optional): JSON data for request body
+            params (Dict, optional): Query parameters
+
+        Returns:
+            Tuple[bool, Dict]: (success, response_data)
+        """
+        url = f"{self.base_url}{endpoint}"
+        headers = self._get_headers()
+
+        try:
+            logger.debug(f"Making {method} request to {url}")
+
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                json=json,
+                params=params,
+                timeout=self.timeout,
+            )
+
+            # Try to parse JSON response
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = {"message": response.text or "No response content"}
+
+            # Check if request was successful
+            if response.status_code >= 200 and response.status_code < 300:
+                logger.debug(f"Request successful: {response.status_code}")
+                return True, response_data
+            else:
+                logger.warning(
+                    f"Request failed: {response.status_code} - {response_data}"
+                )
+                return False, response_data
+
+        except requests.exceptions.Timeout:
+            error_msg = "Request timeout - server took too long to respond"
+            logger.error(error_msg)
+            return False, {"error": error_msg}
+
+        except requests.exceptions.ConnectionError:
+            error_msg = "Connection failed - unable to reach server"
+            logger.error(error_msg)
+            return False, {"error": error_msg}
+
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.error(error_msg)
+            return False, {"error": error_msg}
+
+    def health_check(self) -> Tuple[bool, Dict[str, Any]]:
+        """Check if the API server is responding."""
+        return self._make_request("GET", "/health")
+
+    # Authentication Methods
     def login(self, email: str, password: str) -> Tuple[bool, Dict[str, Any]]:
         """
-        Authenticate user and obtain JWT token.
+        Authenticate user and get JWT token.
+
         Args:
             email (str): User email
             password (str): User password
+
         Returns:
             Tuple[bool, Dict]: (success, response_data)
-            Response format: {"access_token": str, ...}
+            Response format: {"token": str, "user": Dict} on success
         """
         data = {"email": email, "password": password}
         success, resp = self._make_request("POST", "/auth/login", json=data)
+        # Reason: Set JWT token for subsequent requests if login is successful
         if success and "access_token" in resp:
             self.set_token(resp["access_token"])
         return success, resp
 
     def register(
-        self, email: str, password: str, name: str, role: str = "staff"
+        self, name: str, email: str, password: str, role: str = "staff"
     ) -> Tuple[bool, Dict[str, Any]]:
         """
-        Register a new user account.
+        Register a new user.
+
         Args:
-            email (str): User email
-            password (str): User password
-            name (str): User name
-            role (str): User role (default: staff)
+            name (str): User's full name
+            email (str): User's email address
+            password (str): User's password
+            role (str): User's role (admin or staff)
+
         Returns:
             Tuple[bool, Dict]: (success, response_data)
         """
-        data = {"email": email, "password": password, "name": name, "role": role}
+        data = {"name": name, "email": email, "password": password, "role": role}
         return self._make_request("POST", "/auth/register", json=data)
 
-    """
-    HTTP client for communicating with the Flask backend API.
-
-    Provides methods for all user management operations and handles
-    error responses appropriately for display in the Flet UI.
-    """
-
-    def __init__(self, base_url: str = "http://127.0.0.1:5000"):
-        """
-        Initialize API client.
-
-        Args:
-            base_url (str): Base URL of the Flask backend API
-        """
-        self.base_url = base_url.rstrip("/")
-        self.timeout = 10  # seconds
-        self.session = requests.Session()
-
-        # Set default headers
-        self.session.headers.update(
-            {"Content-Type": "application/json", "Accept": "application/json"}
-        )
-
-        # JWT token (in-memory)
-        self._jwt_token = None
-
-        logger.info(f"API Client initialized with base URL: {self.base_url}")
-
-    def set_token(self, token: str):
-        """
-        Store JWT token in memory and set Authorization header.
-        Args:
-            token (str): JWT token string
-        """
-        self._jwt_token = token
-        self.session.headers.update({"Authorization": f"Bearer {token}"})
-
-    def clear_token(self):
-        """
-        Remove JWT token from memory and headers.
-        """
-        self._jwt_token = None
-        self.session.headers.pop("Authorization", None)
-
-    def _make_request(
-        self, method: str, endpoint: str, **kwargs
-    ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Make an HTTP request and handle common errors.
-
-        Args:
-            method (str): HTTP method (GET, POST, PUT, DELETE)
-            endpoint (str): API endpoint (without base URL)
-            **kwargs: Additional arguments for requests
-
-        Returns:
-            Tuple[bool, Dict]: (success_flag, response_data)
-        """
-        url = f"{self.base_url}{endpoint}"
-
-        # Attach JWT token to headers if present (for manual requests)
-        headers = kwargs.pop("headers", None)
-        if self._jwt_token:
-            if headers is None:
-                headers = {}
-            headers["Authorization"] = f"Bearer {self._jwt_token}"
-        if headers:
-            kwargs["headers"] = headers
-
-        try:
-            # Add timeout if not specified
-            kwargs.setdefault("timeout", self.timeout)
-
-            logger.debug(f"Making {method} request to {url}")
-            response = self.session.request(method, url, **kwargs)
-
-            # Try to parse JSON response
-            try:
-                data = response.json()
-            except ValueError:
-                # Non-JSON response
-                data = {"error": f"Invalid response format: {response.text[:100]}"}
-
-            # Check HTTP status
-            if response.status_code >= 400:
-                error_msg = data.get("error", f"HTTP {response.status_code} error")
-                logger.warning(f"API request failed: {method} {url} - {error_msg}")
-                # If unauthorized, clear token
-                if response.status_code == 401:
-                    self.clear_token()
-                return False, {"error": error_msg, "status_code": response.status_code}
-
-            logger.debug(f"API request successful: {method} {url}")
-            return True, data
-
-        except requests.exceptions.ConnectionError:
-            error_msg = "Cannot connect to backend server. Please ensure the Flask app is running."
-            logger.error(f"Connection error: {error_msg}")
-            return False, {"error": error_msg}
-
-        except requests.exceptions.Timeout:
-            error_msg = f"Request timed out after {self.timeout} seconds"
-            logger.error(f"Timeout error: {error_msg}")
-            return False, {"error": error_msg}
-
-        except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
-            logger.error(f"Unexpected API error: {error_msg}")
-            return False, {"error": error_msg}
-
-    def health_check(self) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Check if the backend API is healthy and responsive.
-
-        Returns:
-            Tuple[bool, Dict]: (success, response_data)
-        """
-        return self._make_request("GET", "/health")
-
-    # User Management API Methods
-
+    # User Management API Methods - Delegate to UserAPI
     def get_all_users(self, active_only: bool = True) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Get all users from the backend.
-
-        Args:
-            active_only (bool): If True, only return active users
-
-        Returns:
-            Tuple[bool, Dict]: (success, response_data)
-            Response format: {"success": bool, "users": List[Dict], "count": int}
-        """
-        params = {"active_only": str(active_only).lower()}
-        return self._make_request("GET", "/api/users", params=params)
+        return self.user_api.get_all_users(self._make_request, active_only)
 
     def get_user(self, user_id: int) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Get a specific user by ID.
-
-        Args:
-            user_id (int): User ID to retrieve
-
-        Returns:
-            Tuple[bool, Dict]: (success, response_data)
-            Response format: {"success": bool, "user": Dict}
-        """
-        return self._make_request("GET", f"/api/users/{user_id}")
+        return self.user_api.get_user(self._make_request, user_id)
 
     def create_user(
         self,
@@ -222,29 +212,9 @@ class APIClient:
         email: Optional[str] = None,
         role: str = "staff",
     ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Create a new user.
-
-        Args:
-            name (str): User's name (required)
-            birth (Optional[int]): Birth year
-            active (bool): Whether user is active
-            password (Optional[str]): User password
-            email (Optional[str]): User email
-
-        Returns:
-            Tuple[bool, Dict]: (success, response_data)
-            Response format: {"success": bool, "user": Dict, "message": str}
-        """
-        data = {"name": name, "active": active, "role": role}
-        if birth is not None:
-            data["birth"] = birth
-        if password is not None:
-            data["password"] = password
-        if email is not None:
-            data["email"] = email
-
-        return self._make_request("POST", "/api/users", json=data)
+        return self.user_api.create_user(
+            self._make_request, name, birth, active, password, email, role
+        )
 
     def update_user(
         self,
@@ -253,69 +223,151 @@ class APIClient:
         birth: Optional[int] = None,
         active: Optional[bool] = None,
     ) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Update an existing user.
-
-        Args:
-            user_id (int): User ID to update
-            name (Optional[str]): New name
-            birth (Optional[int]): New birth year
-            active (Optional[bool]): New active status
-
-        Returns:
-            Tuple[bool, Dict]: (success, response_data)
-            Response format: {"success": bool, "user": Dict, "message": str}
-        """
-        data = {}
-        if name is not None:
-            data["name"] = name
-        if birth is not None:
-            data["birth"] = birth
-        if active is not None:
-            data["active"] = active
-
-        if not data:
-            return False, {"error": "No fields provided for update"}
-
-        return self._make_request("PUT", f"/api/users/{user_id}", json=data)
+        return self.user_api.update_user(
+            self._make_request, user_id, name, birth, active
+        )
 
     def delete_user(self, user_id: int) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Delete a user by ID.
+        return self.user_api.delete_user(self._make_request, user_id)
 
-        Args:
-            user_id (int): User ID to delete
+    # Client Management API Methods - Delegate to ClientAPI
+    def get_all_clients(self, active_only: bool = True) -> Tuple[bool, Dict[str, Any]]:
+        return self.client_api.get_all_clients(self._make_request, active_only)
 
-        Returns:
-            Tuple[bool, Dict]: (success, response_data)
-            Response format: {"success": bool, "message": str}
-        """
-        return self._make_request("DELETE", f"/api/users/{user_id}")
+    def get_client(self, client_id: int) -> Tuple[bool, Dict[str, Any]]:
+        return self.client_api.get_client(self._make_request, client_id)
 
-    def search_user_by_name(self, name: str) -> Tuple[bool, Dict[str, Any]]:
-        """
-        Search for a user by name.
+    def create_client(
+        self,
+        name: str,
+        phone: str = "",
+        email: str = "",
+        notes: str = "",
+        active: bool = True,
+    ) -> Tuple[bool, Dict[str, Any]]:
+        return self.client_api.create_client(
+            self._make_request, name, phone, email, notes, active
+        )
 
-        Args:
-            name (str): Name to search for
+    def update_client(
+        self,
+        client_id: int,
+        name: Optional[str] = None,
+        phone: Optional[str] = None,
+        email: Optional[str] = None,
+        notes: Optional[str] = None,
+        active: Optional[bool] = None,
+    ) -> Tuple[bool, Dict[str, Any]]:
+        return self.client_api.update_client(
+            self._make_request, client_id, name, phone, email, notes, active
+        )
 
-        Returns:
-            Tuple[bool, Dict]: (success, response_data)
-            Response format: {"success": bool, "user": Dict}
-        """
-        params = {"name": name}
-        return self._make_request("GET", "/api/users/search", params=params)
+    def delete_client(self, client_id: int) -> Tuple[bool, Dict[str, Any]]:
+        return self.client_api.delete_client(self._make_request, client_id)
+
+    def search_client_by_name(self, name: str) -> Tuple[bool, Dict[str, Any]]:
+        return self.client_api.search_client_by_name(self._make_request, name)
+
+    # Artist Management API Methods - Delegate to ArtistAPI
+    def get_all_artists(self) -> Tuple[bool, Dict[str, Any]]:
+        return self.artist_api.get_all_artists(self._make_request)
+
+    def get_artist(self, artist_id: int) -> Tuple[bool, Dict[str, Any]]:
+        return self.artist_api.get_artist(self._make_request, artist_id)
+
+    def create_artist(
+        self,
+        name: str,
+        phone: str = "",
+        email: str = "",
+        bio: str = "",
+        portfolio: str = "",
+    ) -> Tuple[bool, Dict[str, Any]]:
+        return self.artist_api.create_artist(
+            self._make_request, name, phone, email, bio, portfolio
+        )
+
+    def update_artist(
+        self,
+        artist_id: int,
+        name: Optional[str] = None,
+        phone: Optional[str] = None,
+        email: Optional[str] = None,
+        bio: Optional[str] = None,
+        portfolio: Optional[str] = None,
+    ) -> Tuple[bool, Dict[str, Any]]:
+        return self.artist_api.update_artist(
+            self._make_request, artist_id, name, phone, email, bio, portfolio
+        )
+
+    def delete_artist(self, artist_id: int) -> Tuple[bool, Dict[str, Any]]:
+        return self.artist_api.delete_artist(self._make_request, artist_id)
+
+    # Session Management API Methods - Delegate to SessionAPI
+    def get_all_sessions(self) -> Tuple[bool, Dict[str, Any]]:
+        return self.session_api.get_all_sessions(self._make_request)
+
+    def get_session(self, session_id: int) -> Tuple[bool, Dict[str, Any]]:
+        return self.session_api.get_session(self._make_request, session_id)
+
+    def create_session(
+        self,
+        client_id: int,
+        artist_id: int,
+        session_date: str,
+        duration: float,
+        description: str = "",
+        price: float = 0.0,
+        status: str = "scheduled",
+    ) -> Tuple[bool, Dict[str, Any]]:
+        return self.session_api.create_session(
+            self._make_request,
+            client_id,
+            artist_id,
+            session_date,
+            duration,
+            description,
+            price,
+            status,
+        )
+
+    def update_session(
+        self,
+        session_id: int,
+        client_id: Optional[int] = None,
+        artist_id: Optional[int] = None,
+        session_date: Optional[str] = None,
+        duration: Optional[float] = None,
+        description: Optional[str] = None,
+        price: Optional[float] = None,
+        status: Optional[str] = None,
+    ) -> Tuple[bool, Dict[str, Any]]:
+        return self.session_api.update_session(
+            self._make_request,
+            session_id,
+            client_id,
+            artist_id,
+            session_date,
+            duration,
+            description,
+            price,
+            status,
+        )
+
+    def delete_session(self, session_id: int) -> Tuple[bool, Dict[str, Any]]:
+        return self.session_api.delete_session(self._make_request, session_id)
+
+    def search_session(self, query: str) -> Tuple[bool, Dict[str, Any]]:
+        return self.session_api.search_session(self._make_request, query)
 
 
-# Global API client instance
-api_client = APIClient()
+# Global instance for easy access
+_api_client = None
 
 
 def get_api_client() -> APIClient:
-    """
-    Get the global API client instance.
-
-    Returns:
-        APIClient: Configured API client instance
-    """
-    return api_client
+    """Get the global APIClient instance."""
+    global _api_client
+    if _api_client is None:
+        _api_client = APIClient()
+    return _api_client

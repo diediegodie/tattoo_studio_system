@@ -13,6 +13,8 @@ PYTHONPATH="$(pwd)" pytest -v tests/backend/
 
 echo "Running frontend tests..."
 PYTHONPATH="$(pwd)" pytest -v tests/frontend/
+echo "Running APIClient authentication tests..."
+PYTHONPATH="$(pwd)" pytest -v tests/frontend/test_api_client_auth.py
 
 echo "Running integration tests..."
 echo "Ensuring backend server is stopped before starting tests..."
